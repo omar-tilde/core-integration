@@ -1,0 +1,12 @@
+target/
+build/
+.idea/
+.vscode/
+*.iml
+.git/
+.gitignore
+.dockerignore
+README.md
+ARCHITECTURE.md
+.github/
+**/test/

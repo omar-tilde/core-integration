@@ -1,0 +1,63 @@
+# ============================================================================
+#  Core Integration — aviation order & reservation aggregator
+# ============================================================================
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: core-integration
+  mvc:
+    problemdetails:
+      enabled: true
+
+# ---------------------------------------------------------------------------
+# Provider configuration
+# Set a provider's `enabled` flag to false to remove it from the application
+# context entirely (see ProviderInfrastructureConfiguration for the
+# @ConditionalOnProperty wiring).
+# ---------------------------------------------------------------------------
+providers:
+  travelport:
+    enabled: true
+    base-url: https://api.travelport.com/universal
+    branch-code: ${TRAVELPORT_BRANCH_CODE:P7777777}
+    username: ${TRAVELPORT_USERNAME:}
+    password: ${TRAVELPORT_PASSWORD:}
+    connection-timeout-ms: 5000
+    read-timeout-ms: 30000
+
+  amadeus:
+    enabled: true
+    base-url: https://api.amadeus.com/v2
+    client-id: ${AMADEUS_CLIENT_ID:}
+    client-secret: ${AMADEUS_CLIENT_SECRET:}
+    connection-timeout-ms: 5000
+    read-timeout-ms: 30000
+
+# ---------------------------------------------------------------------------
+# Spring Boot Actuator
+# ---------------------------------------------------------------------------
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging:
+  level:
+    com.coreorder: INFO
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
