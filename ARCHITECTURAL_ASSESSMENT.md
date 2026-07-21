@@ -63,10 +63,10 @@ core-integration-parent (POM)
 
 1. **Infrastructure Depending on Application (`infrastructure` ──▶ `application`):**
    - In `infrastructure/pom.xml`, the `application` module is explicitly declared as a dependency.
-   - The adapters in `infrastructure` import `com.coreorder.application.provider.ProviderCommunicationException`.
+   - The adapters in `infrastructure` import `com.core.service.application.provider.ProviderCommunicationException`.
    - In Hexagonal / Clean Architecture, `infrastructure` implements outbound ports defined in `domain`. It must **never** depend on `application`.
 2. **Exception Scope Misplacement:**
-   - Provider interaction exceptions (such as `ProviderCommunicationException`) are housed in the `application` layer (`com.coreorder.application.provider`) instead of `domain` or `domain.port.out`. This forced `infrastructure` to depend on `application`.
+   - Provider interaction exceptions (such as `ProviderCommunicationException`) are housed in the `application` layer (`com.core.service.application.provider`) instead of `domain` or `domain.port.out`. This forced `infrastructure` to depend on `application`.
 
 ---
 

@@ -56,7 +56,7 @@
 > **Maven coordinates.** The project `groupId` is **`com.core.service`** and the
 > module `artifactId`s are **`main`**, **`application`**, **`domain`**,
 > **`presentation`**, **`infrastructure`** and **`utilities`**. Java packages
-> remain `com.coreorder.*` — only the Maven coordinates were renamed.
+> are **`com.core.service.*`**, matching the Maven `groupId`.
 
 ---
 
@@ -68,8 +68,8 @@ core-integration/
 ├── domain/             # Pure Java: entities, value objects, enums, ports
 ├── application/        # Use cases, commands, DTOs, mappers, router, services
 ├── infrastructure/     # Provider adapters (Travelport, Amadeus) + config
-├── presentation/       # REST controllers, request/response, exception handler
-└── main/               # @SpringBootApplication, application.yml, security config
+├── presentation/       # REST controllers, request/response, exception handler, HTTP security
+└── main/               # @SpringBootApplication + application.yml (composition root)
 ```
 
 The dependency graph is strictly **inward**, and every module also depends on
@@ -250,8 +250,8 @@ Test layout:
 | `domain/`       | Pure JUnit + AssertJ. Validates invariants on entities & value objects |
 | `application/`  | Router resolution logic, application service orchestration            |
 | `infrastructure/` | Adapter mapping, mock-client behaviour                              |
-| `presentation/` | `@WebMvcTest` slice tests for controllers + global exception handler  |
-| `main/`         | `@SpringBootTest` context load + API-key security integration test    |
+| `presentation/` | `@WebMvcTest` slice tests for controllers, global exception handler and API-key security |
+| `main/`         | `@SpringBootTest` context load (composition-root smoke test)           |
 
 ---
 

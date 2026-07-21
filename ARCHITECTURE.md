@@ -50,7 +50,7 @@ No changes to `domain/`, `application/` or `presentation/` are required.
 > **Maven coordinates.** `groupId` is **`com.core.service`**; the module
 > `artifactId`s are **`main`**, **`application`**, **`domain`**,
 > **`presentation`**, **`infrastructure`** and **`utilities`**. Java packages
-> remain `com.coreorder.*` — only the Maven coordinates were renamed.
+> are **`com.core.service.*`**, matching the Maven `groupId`.
 
 ---
 
@@ -62,8 +62,8 @@ core-integration/                       (parent POM — groupId com.core.service
 ├── domain/             (innermost layer — pure Java)
 ├── application/        (use cases, depends on domain)
 ├── infrastructure/     (provider adapters, depends on application)
-├── presentation/       (REST controllers, depends on application)
-└── main/               (Spring Boot entry point, wires everything + security)
+├── presentation/       (REST controllers, depends on application, owns HTTP security)
+└── main/               (Spring Boot entry point — composition root, wires everything)
 ```
 
 ### 3.1 Dependency flow (inward only, utilities everywhere)
@@ -88,8 +88,8 @@ Jackson, Hibernate or any other framework. Adding a new framework dependency to
 | **domain**         | Entities, value objects, enums, domain services, outbound ports                                  | nothing (pure Java)     |
 | **application**    | Use cases, commands, queries, DTOs, mappers, `ProviderRouter`, application services, exceptions  | `domain` only           |
 | **infrastructure** | Provider adapters (Travelport, Amadeus), their clients, configuration, exceptions                | `domain`, `application` |
-| **presentation**   | REST controllers, request/response DTOs, validation, global exception handler                     | `application`, `domain` |
-| **main**           | `@SpringBootApplication` class, `application.yml`, security filter chain, executable JAR         | all of the above        |
+| **presentation**   | REST controllers, request/response DTOs, validation, global exception handler, API-key HTTP security | `application`, `domain` |
+| **main**           | `@SpringBootApplication` class, `application.yml`, executable JAR (composition root)            | all of the above        |
 
 ---
 
@@ -265,7 +265,7 @@ dropping providers.
 3. Create `<id>Client` (transport) and three adapters implementing the three outbound
    ports, each annotated with `@ConditionalOnProperty(prefix = "providers.<id>", …)`.
 4. (Optional) Add unit tests under
-   `infrastructure/src/test/java/com/coreorder/infrastructure/provider/<id>/`.
+   `infrastructure/src/test/java/com/core/service/infrastructure/provider/<id>/`.
 
 ---
 
@@ -293,37 +293,46 @@ presentation/
   annotations on the request records.
 - `GlobalExceptionHandler` converts known exceptions into a uniform
   `ErrorResponse` (RFC 7807-style). Unknown exceptions become `500`.
+- **HTTP security** (API-key authentication) is owned here too: the
+  `SecurityFilterChain` and its supporting filter/properties/handlers live in the
+  `presentation/security` package, so the web boundary — controllers and auth — are
+  colocated. See §8.1.
 
 ---
 
-## 8. Boot module (`main`) & security
+## 8. Boot module (`main`)
 
-The boot module is the only place that produces an executable JAR and the only place
-that wires HTTP security. It is intentionally minimal:
+The boot module is the **composition root**: the only place that produces an
+executable JAR and wires every layer together. It is intentionally minimal and
+holds **no business or web logic of its own** — security included:
 
 - `CoreIntegrationApplication` carries `@SpringBootApplication` and
-  `@ConfigurationPropertiesScan("com.coreorder")`.
+  `@ConfigurationPropertiesScan("com.core.service")`, scanning every module from the
+  shared root package.
 - `application.yml` ships sensible defaults and externalises provider
   credentials and the API key via environment variables.
-- `security/ApiKeySecurityConfig` declares the `SecurityFilterChain` bean.
 
-### 8.1 API key authentication
+### 8.1 Presentation-layer security (API key authentication)
 
-All application endpoints are protected by a shared API key:
+HTTP security is an **interface-layer concern**, so it lives in the `presentation`
+module alongside the REST controllers — not in the entry point. This keeps `main` a
+pure composition root and lets the security filter chain be verified with a focused
+`@WebMvcTest` slice in the presentation module. The `presentation` module declares the
+`spring-boot-starter-security` dependency; `main` inherits it transitively.
 
-- `security/ApiKeyAuthenticationFilter` reads the key from a configurable request
-  header (default `X-API-KEY`) and, when it matches the configured `api.key`,
+- `presentation/security/ApiKeyAuthenticationFilter` reads the key from a configurable
+  request header (default `X-API-KEY`) and, when it matches the configured `api.key`,
   establishes an authenticated `SecurityContext`.
-- `security/ApiKeySecurityConfig` makes the filter chain **stateless**, disables
-  CSRF / form login / basic auth, and requires authentication on every request
-  except an explicit public allow-list:
+- `presentation/security/ApiKeySecurityConfig` declares the `SecurityFilterChain` bean,
+  makes the filter chain **stateless**, disables CSRF / form login / basic auth, and
+  requires authentication on every request except an explicit public allow-list:
   - `GET /actuator/health`
   - `GET /actuator/info`
   - `/error`
-- `security/ApiKeySecurityHandlers` replaces Spring Security's default responses with
-  the application's standard JSON `ErrorResponse`: **401 Unauthorized** for
-  missing/invalid keys, **403 Forbidden** otherwise.
-- `security/ApiKeyProperties` binds `api.key` (env `API_KEY`) and
+- `presentation/security/ApiKeySecurityHandlers` replaces Spring Security's default
+  responses with the application's standard JSON `ErrorResponse`: **401 Unauthorized**
+  for missing/invalid keys, **403 Forbidden** otherwise.
+- `presentation/security/ApiKeyProperties` binds `api.key` (env `API_KEY`) and
   `api.header-name` (env `API_HEADER_NAME`). The key is read from configuration only
   — it is never hard-coded in Java.
 
@@ -341,9 +350,9 @@ api:
 
 | Class                          | Package                          | Helpers                                                        |
 |--------------------------------|----------------------------------|----------------------------------------------------------------|
-| `LogUtils`                     | `com.coreorder.utilities.logging`| `forClass`, `forName`, MDC `putCorrelationId` / `clearCorrelationId` |
-| `StringUtils`                  | `com.coreorder.utilities.string` | `isBlank`, `defaultIfBlank`, `truncate`, `randomToken`, `toBase64`   |
-| `DateUtils`                    | `com.coreorder.utilities.date`   | `nowUtc`, `todayUtc`, ISO `format`/`parse`, pattern `format`/`parse` |
+| `LogUtils`                     | `com.core.service.utilities.logging`| `forClass`, `forName`, MDC `putCorrelationId` / `clearCorrelationId` |
+| `StringUtils`                  | `com.core.service.utilities.string` | `isBlank`, `defaultIfBlank`, `truncate`, `randomToken`, `toBase64`   |
+| `DateUtils`                    | `com.core.service.utilities.date`   | `nowUtc`, `todayUtc`, ISO `format`/`parse`, pattern `format`/`parse` |
 
 The module depends only on `slf4j-api` and is depended on by `domain`, `application`,
 `infrastructure`, `presentation` and `main`, so the helpers are available throughout the
