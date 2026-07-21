@@ -6,13 +6,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.coreorder</groupId>
-        <artifactId>core-integration-parent</artifactId>
+        <groupId>com.core.service</groupId>
+        <artifactId>parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>domain</artifactId>
-    <name>Core Integration - Domain</name>
+    <name>domain</name>
     <description>
         Domain layer — pure Java entities, value objects, enums and provider ports.
         Has zero dependencies on Spring, Jackson, Hibernate or any framework.
@@ -23,6 +23,10 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.core.service</groupId>
+            <artifactId>utilities</artifactId>
         </dependency>
 
         <!-- Test dependencies -->

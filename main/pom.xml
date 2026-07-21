@@ -6,13 +6,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.coreorder</groupId>
-        <artifactId>core-integration-parent</artifactId>
+        <groupId>com.core.service</groupId>
+        <artifactId>parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>main</artifactId>
-    <name>Core Integration - Main</name>
+    <name>main</name>
     <description>
         Spring Boot entry point — wires all layers together and produces the executable
         bootable JAR. Composes the domain, application, infrastructure and presentation modules.
@@ -20,29 +20,49 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.coreorder</groupId>
+            <groupId>com.core.service</groupId>
             <artifactId>domain</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.coreorder</groupId>
+            <groupId>com.core.service</groupId>
             <artifactId>application</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.coreorder</groupId>
+            <groupId>com.core.service</groupId>
             <artifactId>infrastructure</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.coreorder</groupId>
+            <groupId>com.core.service</groupId>
             <artifactId>presentation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.core.service</groupId>
+            <artifactId>utilities</artifactId>
         </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-log4j2</artifactId>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -55,6 +75,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-logging</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 

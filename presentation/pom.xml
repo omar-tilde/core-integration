@@ -6,13 +6,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.coreorder</groupId>
-        <artifactId>core-integration-parent</artifactId>
+        <groupId>com.core.service</groupId>
+        <artifactId>parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>presentation</artifactId>
-    <name>Core Integration - Presentation</name>
+    <name>presentation</name>
     <description>
         Presentation layer — REST controllers, request/response models and global exception
         handling. The only layer that exposes an HTTP API; depends on the application layer.
@@ -20,12 +20,21 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.coreorder</groupId>
+            <groupId>com.core.service</groupId>
             <artifactId>application</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.core.service</groupId>
+            <artifactId>utilities</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

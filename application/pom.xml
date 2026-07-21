@@ -6,13 +6,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.coreorder</groupId>
-        <artifactId>core-integration-parent</artifactId>
+        <groupId>com.core.service</groupId>
+        <artifactId>parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>application</artifactId>
-    <name>Core Integration - Application</name>
+    <name>application</name>
     <description>
         Application layer — use cases, commands, queries, DTOs, mappers and the provider router.
         Depends on the domain only (plus a thin slice of Spring for DI).
@@ -20,9 +20,10 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.coreorder</groupId>
+            <groupId>com.core.service</groupId>
             <artifactId>domain</artifactId>
         </dependency>
+
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
@@ -30,6 +31,10 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-tx</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.core.service</groupId>
+            <artifactId>utilities</artifactId>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
