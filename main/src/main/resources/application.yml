@@ -61,3 +61,17 @@ logging:
     root: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"
+
+# ---------------------------------------------------------------------------
+# API key authentication
+# ---------------------------------------------------------------------------
+# The API key is read from `api.key`, which binds from the API_KEY environment
+# variable (or this property). Every HTTP endpoint is protected and must present
+# the key in the configured header (default: X-API-KEY). Override API_KEY in
+# production — the value below is a local development placeholder only.
+#
+# Public allow-list (no key required): /actuator/health, /actuator/info, /error
+# ---------------------------------------------------------------------------
+api:
+  key: ${API_KEY:dev-only-change-me}
+  header-name: ${API_HEADER_NAME:X-API-KEY}
