@@ -3,6 +3,7 @@ package com.core.service.utilities;
 import com.core.service.utilities.date.DateUtils;
 import com.core.service.utilities.logging.LogUtils;
 import com.core.service.utilities.string.StringUtils;
+import org.apache.logging.log4j.ThreadContext;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -43,6 +44,8 @@ class UtilitiesTest {
     void logUtilsReturnsLoggerAndManagesMdc() {
         assertThat(LogUtils.forClass(UtilitiesTest.class)).isNotNull();
         LogUtils.putCorrelationId("abc-123");
+        assertThat(ThreadContext.get("correlationId")).isEqualTo("abc-123");
         LogUtils.clearCorrelationId();
+        assertThat(ThreadContext.get("correlationId")).isNull();
     }
 }

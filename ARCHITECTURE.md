@@ -354,9 +354,14 @@ api:
 | `StringUtils`                  | `com.core.service.utilities.string` | `isBlank`, `defaultIfBlank`, `truncate`, `randomToken`, `toBase64`   |
 | `DateUtils`                    | `com.core.service.utilities.date`   | `nowUtc`, `todayUtc`, ISO `format`/`parse`, pattern `format`/`parse` |
 
-The module depends only on `slf4j-api` and is depended on by `domain`, `application`,
-`infrastructure`, `presentation` and `main`, so the helpers are available throughout the
-codebase without re-implementing them per module.
+The module depends only on Apache Log4j2 (`log4j-api` + `log4j-core`, versions
+managed by the Spring Boot BOM) and is depended on by `domain`, `application`,
+`infrastructure`, `presentation` and `main`, so the helpers are available throughout
+the codebase without re-implementing them per module. `LogUtils` is built directly on
+the Log4j2 API; the runnable `main` module uses `spring-boot-starter-log4j2` so the
+whole application logs through one consistent Log4j2 backend (SLF4J calls are bridged
+via `log4j-slf4j2-impl`). A Log4j2 configuration lives in this module's
+`src/main/resources/log4j2.xml`.
 
 ---
 
