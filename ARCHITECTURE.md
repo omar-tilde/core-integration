@@ -24,8 +24,8 @@ Two providers are wired today:
 A new provider (Sabre, Navitaire, direct NDC, …) is added by:
 
 1. Implementing the outbound ports in `domain/port/out/`.
-2. Adding a Spring configuration class in `infrastructure/config/` that wires the
-   new adapter under `@ConditionalOnProperty(prefix = "providers.<id>", …)`.
+2. Adding an adapter in `infrastructure/` annotated with
+   `@ConditionalOnProperty(prefix = "providers.<id>", …)`.
 
 No changes to `domain/`, `application/` or `presentation/` are required.
 
@@ -39,6 +39,7 @@ No changes to `domain/`, `application/` or `presentation/` are required.
 | Runtime            | Spring Boot **4.0.7** (Servlet 6.1 / Spring Framework 7) |
 | Web                | `spring-boot-starter-webmvc` (Tomcat 11)              |
 | Reactive client    | `spring-boot-starter-webflux` (WebClient)              |
+| Security           | Spring Security 7 (`spring-boot-starter-security`)       |
 | Validation         | Jakarta Validation 3.1 (`jakarta.*`)                   |
 | Configuration      | Spring Boot ConfigurationProperties + Records          |
 | Build              | Maven 3.9+ (multi-module)                              |
@@ -46,44 +47,49 @@ No changes to `domain/`, `application/` or `presentation/` are required.
 | Container          | `eclipse-temurin:25`                                  |
 | JSON               | Jackson 3 (Spring Boot 4 default)                      |
 
-> **Why Jackson 3?** Spring Boot 4 ships Jackson 3 as the default. The classic Jackson
-> 2 bridge (`spring-boot-jackson2`) is still available for projects that need a
-> longer migration runway. The annotations in `com.fasterxml.jackson.annotation`
-> remain unchanged and are shared between Jackson 2 and 3.
+> **Maven coordinates.** `groupId` is **`com.core.service`**; the module
+> `artifactId`s are **`main`**, **`application`**, **`domain`**,
+> **`presentation`**, **`infrastructure`** and **`utilities`**. Java packages
+> remain `com.coreorder.*` — only the Maven coordinates were renamed.
 
 ---
 
 ## 3. Module layout
 
-```
-core-integration/                       (parent POM — groupId com.coreorder)
-├── domain/                             (innermost layer — pure Java)
-├── application/                        (use cases, depends on domain)
-├── infrastructure/                     (provider adapters, depends on application)
-├── presentation/                       (REST controllers, depends on application)
-└── main/                               (Spring Boot entry point, wires everything)
+```text
+core-integration/                       (parent POM — groupId com.core.service)
+├── utilities/          (cross-cutting helpers — logging, string, date)
+├── domain/             (innermost layer — pure Java)
+├── application/        (use cases, depends on domain)
+├── infrastructure/     (provider adapters, depends on application)
+├── presentation/       (REST controllers, depends on application)
+└── main/               (Spring Boot entry point, wires everything + security)
 ```
 
-### 3.1 Dependency flow (inward only)
+### 3.1 Dependency flow (inward only, utilities everywhere)
 
-```
+```text
    main  ──▶ presentation  ──▶ application  ──▶ domain
                                 └─▶ infrastructure ─┘
+                              │
+              utilities  ◀────┴────────────────────────── (used by every module)
 ```
 
 The arrows **always point inward**. The domain has **zero** dependencies on Spring,
 Jackson, Hibernate or any other framework. Adding a new framework dependency to
-`domain/pom.xml` is a build failure waiting to happen.
+`domain/pom.xml` is a build failure waiting to happen. `utilities` depends only on
+`slf4j-api` and is depended on by all other modules.
 
 ### 3.2 What lives where
 
 | Module             | Responsibility                                                                                   | Talks to                |
 |--------------------|--------------------------------------------------------------------------------------------------|-------------------------|
+| **utilities**      | Shared, framework-light helpers: `LogUtils`, `StringUtils`, `DateUtils`                            | nothing (slf4j-api only) |
 | **domain**         | Entities, value objects, enums, domain services, outbound ports                                  | nothing (pure Java)     |
 | **application**    | Use cases, commands, queries, DTOs, mappers, `ProviderRouter`, application services, exceptions  | `domain` only           |
-| **infrastructure** | Provider adapters (Travelport, Amadeus), their clients, configuration, registry, exceptions     | `domain`, `application` |
+| **infrastructure** | Provider adapters (Travelport, Amadeus), their clients, configuration, exceptions                | `domain`, `application` |
 | **presentation**   | REST controllers, request/response DTOs, validation, global exception handler                     | `application`, `domain` |
-| **main**           | `@SpringBootApplication` class, `application.yml`, executable JAR                               | all of the above        |
+| **main**           | `@SpringBootApplication` class, `application.yml`, security filter chain, executable JAR         | all of the above        |
 
 ---
 
@@ -91,7 +97,7 @@ Jackson, Hibernate or any other framework. Adding a new framework dependency to
 
 The domain models the **life-cycle of a flight order** in provider-agnostic terms.
 
-```
+```text
 domain/
 ├── model/
 │   ├── entity/
@@ -133,7 +139,7 @@ domain/
 - `AirportCode`, `AirlineCode`, `BookingClass` validate IATA format on
   construction; they cannot exist in an invalid state.
 
-### 4.2 Outbound ports
+### 4.2 Outbound ports and provider status
 
 The domain defines the contracts that the rest of the application depends on.
 The infrastructure module supplies one or more implementations per port.
@@ -144,15 +150,17 @@ The infrastructure module supplies one or more implementations per port.
 | `OrderManagementProvider`     | Create / retrieve / cancel orders, capture payment intent        |
 | `PricingProvider`             | Re-price an offer for a specific passenger list                  |
 
-A provider is identified by a stable, upper-case string (e.g. `"AMADEUS"`).
-Two providers that disagree on identifier collide at the `ProviderRouter`
-and the application fails fast at boot time.
+Every provider strategy implements `ProviderStrategy`, whose single status method is
+**`isEnabled()`** (the former `isAvailable()` / client `isReachable()` checks were
+consolidated into this one method). `isEnabled()` simply reflects the provider's
+`enabled` configuration flag. A provider is identified by a stable, upper-case string
+(e.g. `"AMADEUS"`).
 
 ---
 
 ## 5. Application layer
 
-```
+```text
 application/
 ├── command/                 # Use-case input objects (immutable records)
 │   ├── CreateOrderCommand.java
@@ -167,50 +175,52 @@ application/
 ├── provider/                # Provider-routing infrastructure
 │   ├── ProviderRouter.java
 │   ├── ProviderNotFoundException.java
-│   ├── ProviderUnavailableException.java
-│   └── NoProviderAvailableException.java
+│   └── ProviderUnavailableException.java
 ├── service/                 # Application services (one per use case family)
 │   ├── FlightSearchService.java
 │   └── OrderService.java
-└── config/
-    └── ApplicationConfiguration.java
+└── (exception base package)
 ```
 
-### 5.1 `ProviderRouter`
+### 5.1 `ProviderRouter` — explicit selection, no fallback
 
-The router is a **strategy selector**. It accepts:
+The router is a **strategy selector**. It accepts lists of `FlightSearchProvider`,
+`OrderManagementProvider` and `PricingProvider` beans (Spring injects all of them) and
+exposes lookup by provider id/type.
 
-- A list of `FlightSearchProvider` beans (Spring injects all of them).
-- A list of `OrderManagementProvider` beans.
-- A list of `PricingProvider` beans.
+**There is no fallback to "the first available provider".** The application uses
+**only the explicitly requested provider**:
 
-It exposes lookup by provider id and a "preferred or first available" resolver.
-This is where the application decides which provider actually answers a request.
+- `getProvider(...)` / `resolveProvider(...)` require a non-blank provider id/type.
+- If the requested provider is **missing or cannot be resolved** →
+  `ProviderNotFoundException` (HTTP 404) with a message such as
+  `"Requested flight search provider 'SABRE' is not available."`.
+- If the requested provider is **present but disabled** (`isEnabled() == false`) →
+  `ProviderUnavailableException` (HTTP 503).
+- `getAvailableProviderIds()` / `getAvailableProviderTypes()` still list the
+  currently **enabled** providers (used by the `/providers` endpoints) — these are
+  read-only listings, not fallback logic.
+
+The now-removed `getFirstAvailableProvider()` method and the
+`NoProviderAvailableException` type have been deleted; requests fail fast instead of
+silently switching providers.
 
 ### 5.2 Application services
 
-- `FlightSearchService` maps a `SearchFlightsCommand` to a
-  `FlightSearchCriteria`, asks the resolved `FlightSearchProvider` for offers,
-  and maps them back to `FlightOfferDto`.
-- `OrderService` orchestrates order creation, retrieval, and cancellation.
-  It is the only place that knows how to convert a `CreateOrderCommand`
-  (and its nested payment/passenger data) into a `OrderCreateRequest`
-  that the provider port can consume.
-
-### 5.3 Configuration
-
-`ApplicationConfiguration` is a `@Configuration` class that defines beans
-for the router and the two services. It is intentionally tiny; all
-real wiring lives in the infrastructure layer.
+- `FlightSearchService` maps a `SearchFlightsCommand` to a `FlightSearchCriteria`,
+  asks the **resolved** `FlightSearchProvider` for offers, and maps them back to
+  `FlightOfferDto`. `preferredProvider` is mandatory.
+- `OrderService` orchestrates order creation, retrieval, and cancellation. It is the
+  only place that converts a `CreateOrderCommand` (and its nested payment/passenger
+  data) into an `OrderCreateRequest` that the provider port can consume.
+  `providerId` is mandatory for create, retrieve and cancel.
 
 ---
 
 ## 6. Infrastructure layer
 
-```
+```text
 infrastructure/
-├── config/
-│   └── ProviderInfrastructureConfiguration.java
 ├── exception/
 │   └── ProviderCommunicationException.java
 └── provider/
@@ -232,36 +242,36 @@ infrastructure/
 
 Each provider has a **client** (the transport layer) and three **adapters** that
 implement the outbound ports. Today the clients are in-memory mocks; the public
-HTTP contracts (`AmadeusFlightOfferResponse`, `TravelportFlightResponse`, …)
-are already shaped to map cleanly to the real REST responses.
+HTTP contracts (`AmadeusFlightOfferResponse`, `TravelportFlightResponse`, …) are
+already shaped to map cleanly to the real REST responses.
+
+Each adapter's `isEnabled()` delegates to its client's `isEnabled()`, which returns
+the provider's `enabled` configuration flag.
 
 ### 6.2 Conditional registration
 
-`ProviderInfrastructureConfiguration` declares every provider bean with
+Each adapter/client is annotated with
 `@ConditionalOnProperty(prefix = "providers.<id>", name = "enabled", havingValue = "true")`.
-Flipping `providers.amadeus.enabled: false` in `application.yml` removes
-Amadeus from the application context without code changes.
-
-`ProviderRouter` defensively filters out `null` beans so that a misconfigured
-deployment fails fast instead of silently dropping providers.
+Flipping `providers.amadeus.enabled: false` in `application.yml` removes Amadeus from
+the application context without code changes. The `ProviderRouter` defensively filters
+out `null` beans so a misconfigured deployment fails fast instead of silently
+dropping providers.
 
 ### 6.3 Adding a provider (recipe)
 
 1. Add a `provider.<id>.enabled` flag to `application.yml`.
 2. Create a `<id>Properties` record annotated with
    `@ConfigurationProperties(prefix = "providers.<id>")`.
-3. Create `<id>Client` (transport) and three adapters implementing the
-   three outbound ports.
-4. Register everything in `ProviderInfrastructureConfiguration` behind
-   `@ConditionalOnProperty`.
-5. (Optional) Add unit tests under
+3. Create `<id>Client` (transport) and three adapters implementing the three outbound
+   ports, each annotated with `@ConditionalOnProperty(prefix = "providers.<id>", …)`.
+4. (Optional) Add unit tests under
    `infrastructure/src/test/java/com/coreorder/infrastructure/provider/<id>/`.
 
 ---
 
 ## 7. Presentation layer
 
-```
+```text
 presentation/
 ├── controller/
 │   ├── FlightSearchController.java
@@ -286,43 +296,90 @@ presentation/
 
 ---
 
-## 8. Boot module (`main`)
+## 8. Boot module (`main`) & security
 
-The boot module is the only place that produces an executable JAR.
-It is intentionally minimal:
+The boot module is the only place that produces an executable JAR and the only place
+that wires HTTP security. It is intentionally minimal:
 
 - `CoreIntegrationApplication` carries `@SpringBootApplication` and
   `@ConfigurationPropertiesScan("com.coreorder")`.
 - `application.yml` ships sensible defaults and externalises provider
-  credentials via environment variables.
+  credentials and the API key via environment variables.
+- `security/ApiKeySecurityConfig` declares the `SecurityFilterChain` bean.
 
-The parent POM is configured to apply `spring-boot-maven-plugin` only on
-this module.
+### 8.1 API key authentication
+
+All application endpoints are protected by a shared API key:
+
+- `security/ApiKeyAuthenticationFilter` reads the key from a configurable request
+  header (default `X-API-KEY`) and, when it matches the configured `api.key`,
+  establishes an authenticated `SecurityContext`.
+- `security/ApiKeySecurityConfig` makes the filter chain **stateless**, disables
+  CSRF / form login / basic auth, and requires authentication on every request
+  except an explicit public allow-list:
+  - `GET /actuator/health`
+  - `GET /actuator/info`
+  - `/error`
+- `security/ApiKeySecurityHandlers` replaces Spring Security's default responses with
+  the application's standard JSON `ErrorResponse`: **401 Unauthorized** for
+  missing/invalid keys, **403 Forbidden** otherwise.
+- `security/ApiKeyProperties` binds `api.key` (env `API_KEY`) and
+  `api.header-name` (env `API_HEADER_NAME`). The key is read from configuration only
+  — it is never hard-coded in Java.
+
+```yaml
+api:
+  key: ${API_KEY:dev-only-change-me}        # override via the API_KEY env var in production
+  header-name: ${API_HEADER_NAME:X-API-KEY}
+```
 
 ---
 
-## 9. Key design decisions
+## 9. Utilities module
+
+`utilities` is a framework-light, reusable helper library shared by every module.
+
+| Class                          | Package                          | Helpers                                                        |
+|--------------------------------|----------------------------------|----------------------------------------------------------------|
+| `LogUtils`                     | `com.coreorder.utilities.logging`| `forClass`, `forName`, MDC `putCorrelationId` / `clearCorrelationId` |
+| `StringUtils`                  | `com.coreorder.utilities.string` | `isBlank`, `defaultIfBlank`, `truncate`, `randomToken`, `toBase64`   |
+| `DateUtils`                    | `com.coreorder.utilities.date`   | `nowUtc`, `todayUtc`, ISO `format`/`parse`, pattern `format`/`parse` |
+
+The module depends only on `slf4j-api` and is depended on by `domain`, `application`,
+`infrastructure`, `presentation` and `main`, so the helpers are available throughout the
+codebase without re-implementing them per module.
+
+---
+
+## 10. Key design decisions
 
 1. **Multi-module Maven** — enforces the dependency direction at build time.
 2. **Port-Adapter (Hexagonal) architecture** — ports in domain, adapters in
    infrastructure; the application layer never imports an adapter type.
-3. **Provider Router** — strategy pattern. The router is the only place
-   that maps a `providerId` to an adapter instance.
-4. **Framework-free domain** — no Spring, no Jackson, no JPA in `domain/`.
-5. **Provider-agnostic API** — REST contracts never expose provider-specific
+3. **Explicit provider selection** — the router uses only the named provider and
+   fails fast (no fallback) when it is missing, disabled, or unresolvable.
+4. **Single status method** — `ProviderStrategy.isEnabled()` replaces the previous
+   `isAvailable()` / `isReachable()` split, keeping naming consistent.
+5. **Framework-free domain** — no Spring, no Jackson, no JPA in `domain/`.
+6. **Provider-agnostic API** — REST contracts never expose provider-specific
    fields. The provider id is surfaced as a plain string for traceability.
-6. **Records everywhere** — value objects, DTOs, commands, properties are
+7. **Records everywhere** — value objects, DTOs, commands, properties are
    Java `record`s. Mutability only exists where the domain requires it
    (e.g. the `Order` aggregate root, which has a lifecycle).
-7. **Conditional provider registration** — disabling a provider removes
+8. **Conditional provider registration** — disabling a provider removes
    it from the context cleanly (`@ConditionalOnProperty`).
-8. **Spring Boot 4.0.x baseline** — the project tracks the current LTS-grade
-   Spring Boot line and follows Spring's recommended starter names
-   (`spring-boot-starter-webmvc`, `spring-boot-starter-webmvc-test`, …).
+9. **API key authentication** — a simple, maintainable `OncePerRequestFilter` +
+   `SecurityFilterChain` protects every endpoint while leaving a small public
+   allow-list open.
+10. **Shared utilities module** — logging/string/date helpers live in one place and
+    are reused project-wide, avoiding duplication.
+11. **Spring Boot 4.0.x baseline** — the project tracks the current LTS-grade
+    Spring Boot line and follows Spring's recommended starter names
+    (`spring-boot-starter-webmvc`, `spring-boot-starter-webmvc-test`, …).
 
 ---
 
-## 10. Aviation domain glossary
+## 11. Aviation domain glossary
 
 | Term                | Meaning                                                                                |
 |---------------------|----------------------------------------------------------------------------------------|

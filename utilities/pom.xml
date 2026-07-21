@@ -11,25 +11,20 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>domain</artifactId>
-    <name>Core Integration - Domain</name>
+    <artifactId>utilities</artifactId>
+    <name>Core Integration - Utilities</name>
     <description>
-        Domain layer — pure Java entities, value objects, enums and provider ports.
-        Has zero dependencies on Spring, Jackson, Hibernate or any framework.
+        Cross-cutting, framework-light utilities (logging, string and date helpers)
+        shared by every module in the Core Integration platform.
     </description>
 
     <dependencies>
         <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.core.service</groupId>
-            <artifactId>utilities</artifactId>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
 
-        <!-- Test dependencies -->
+        <!-- Test -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
