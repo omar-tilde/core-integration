@@ -1,24 +1,15 @@
 package com.coreorder.domain.port.out;
 
-import java.util.List;
-
 import com.coreorder.domain.model.entity.Order;
 import com.coreorder.domain.model.entity.Passenger;
 import com.coreorder.domain.model.valueobject.Money;
 
+import java.util.List;
+
 /**
  * Outbound port for order management providers (Travelport, Amadeus, Sabre, etc.).
- * <p>
- * Encapsulates create / retrieve / cancel operations on orders. Provider-specific request
- * payloads are kept inside {@link OrderCreateRequest} to avoid leaking transport details
- * to higher layers.
  */
-public interface OrderManagementProvider {
-
-    /**
-     * @return stable identifier for this provider, e.g. "AMADEUS" or "TRAVELPORT".
-     */
-    String providerId();
+public interface OrderManagementProvider extends ProviderStrategy {
 
     /**
      * Create a new order on the provider system.
@@ -45,19 +36,7 @@ public interface OrderManagementProvider {
     Order cancelOrder(String providerOrderId);
 
     /**
-     * @return whether this provider is currently reachable and enabled.
-     */
-    boolean isAvailable();
-
-    /**
      * Provider-agnostic order creation request.
-     *
-     * @param offerId            identifier of the priced offer being booked
-     * @param passengers         passengers travelling under the order
-     * @param expectedTotalPrice the price the caller expects to be charged (the provider
-     *                           may re-validate / re-quote; the response reflects the
-     *                           final accepted price)
-     * @param payment            payment information (card, billing, etc.)
      */
     record OrderCreateRequest(
             String offerId,
@@ -68,13 +47,6 @@ public interface OrderManagementProvider {
 
     /**
      * Payment information captured at booking time.
-     *
-     * @param method         payment method (CARD, VOUCHER, ...)
-     * @param cardNumber     PAN or equivalent token (never logged)
-     * @param cardHolderName name as it appears on the card
-     * @param expiryMonth    two-digit month string ("07")
-     * @param expiryYear     two- or four-digit year string ("2027")
-     * @param cvv            card verification value (never logged)
      */
     record PaymentInfo(
             PaymentMethod method,

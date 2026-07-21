@@ -1,10 +1,9 @@
 package com.coreorder.presentation.controller;
 
-import java.math.BigDecimal;
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.List;
-
+import com.coreorder.application.flightsearch.FlightOfferDto;
+import com.coreorder.application.flightsearch.FlightSearchService;
+import com.coreorder.application.flightsearch.SearchFlightsCommand;
+import com.coreorder.presentation.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -12,10 +11,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.coreorder.application.command.SearchFlightsCommand;
-import com.coreorder.application.dto.FlightOfferDto;
-import com.coreorder.application.service.FlightSearchService;
-import com.coreorder.presentation.exception.GlobalExceptionHandler;
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;

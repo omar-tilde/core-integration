@@ -1,13 +1,13 @@
 package com.coreorder.domain.model.entity;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.Objects;
-
 import com.coreorder.domain.model.valueobject.AirportCode;
 import com.coreorder.domain.model.valueobject.BookingClass;
 import com.coreorder.domain.model.valueobject.CabinClass;
 import com.coreorder.domain.model.valueobject.FlightNumber;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Objects;
 
 /**
  * A single flight segment (one takeoff to one landing, one flight number).

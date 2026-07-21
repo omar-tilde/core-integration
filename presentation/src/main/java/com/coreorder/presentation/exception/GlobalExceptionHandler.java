@@ -1,7 +1,13 @@
 package com.coreorder.presentation.exception;
 
-import java.util.List;
+import com.coreorder.application.base.exception.InvalidCommandException;
+import com.coreorder.application.base.exception.NoProviderAvailableException;
+import com.coreorder.application.base.exception.ProviderCommunicationException;
+import com.coreorder.application.base.exception.ProviderNotFoundException;
+import com.coreorder.application.base.exception.ProviderUnavailableException;
+import com.coreorder.presentation.response.ErrorResponse;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -10,17 +16,11 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import com.coreorder.application.provider.NoProviderAvailableException;
-import com.coreorder.application.provider.ProviderCommunicationException;
-import com.coreorder.application.provider.ProviderNotFoundException;
-import com.coreorder.application.provider.ProviderUnavailableException;
-import com.coreorder.presentation.response.ErrorResponse;
-
-import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
  * Global exception handler for REST controllers.
- * Converts exceptions to standardized error responses.
+ * Catches application exceptions and converts them to standardized REST status error responses.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -57,6 +57,21 @@ public class GlobalExceptionHandler {
                 "One or more request fields failed validation",
                 request.getRequestURI(),
                 fieldErrors
+        );
+
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(InvalidCommandException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidCommand(
+            InvalidCommandException ex,
+            HttpServletRequest request
+    ) {
+        var response = ErrorResponse.of(
+                HttpStatus.BAD_REQUEST.value(),
+                "Bad Request",
+                ex.getMessage(),
+                request.getRequestURI()
         );
 
         return ResponseEntity.badRequest().body(response);
@@ -169,9 +184,6 @@ public class GlobalExceptionHandler {
     }
 
     private static void logException(Throwable ex) {
-        // Log unexpected exceptions with their full cause chain so operators can diagnose
-        // 500s without needing to reproduce them. We deliberately avoid logging the
-        // request body — it may contain PII.
         log.error("Unhandled exception: {}", ex.getMessage(), ex);
     }
 }

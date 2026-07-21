@@ -68,7 +68,7 @@ core-integration/                       (parent POM — groupId com.coreorder)
 
 ```
    main  ──▶ presentation  ──▶ application  ──▶ domain
-       └──▶ infrastructure ──┘
+                                └─▶ infrastructure ─┘
 ```
 
 The arrows **always point inward**. The domain has **zero** dependencies on Spring,

@@ -1,10 +1,10 @@
 package com.coreorder.domain.model.entity;
 
+import com.coreorder.domain.model.valueobject.AirportCode;
+
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
-
-import com.coreorder.domain.model.valueobject.AirportCode;
 
 /**
  * An itinerary is an ordered sequence of flight segments forming a single direction of travel.

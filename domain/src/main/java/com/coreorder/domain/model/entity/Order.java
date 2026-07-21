@@ -1,11 +1,11 @@
 package com.coreorder.domain.model.entity;
 
+import com.coreorder.domain.model.enums.OrderStatus;
+import com.coreorder.domain.model.valueobject.Money;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
-
-import com.coreorder.domain.model.enums.OrderStatus;
-import com.coreorder.domain.model.valueobject.Money;
 
 /**
  * An order represents a confirmed booking made through the system.

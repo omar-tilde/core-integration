@@ -1,10 +1,10 @@
 package com.coreorder.domain.model.entity;
 
+import com.coreorder.domain.model.valueobject.Money;
+
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
-
-import com.coreorder.domain.model.valueobject.Money;
 
 /**
  * A flight offer represents a priced combination of itineraries that a provider is willing to sell.

@@ -1,8 +1,13 @@
 package com.coreorder.presentation.controller;
 
-import java.time.LocalDate;
-import java.util.List;
+import com.coreorder.application.order.CreateOrderCommand;
+import com.coreorder.application.order.OrderDto;
+import com.coreorder.application.order.OrderService;
+import com.coreorder.application.order.RetrieveOrderQuery;
+import com.coreorder.presentation.request.CreateOrderRequest;
+import com.coreorder.presentation.response.OrderResponse;
 
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -14,19 +19,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.coreorder.application.command.CreateOrderCommand;
-import com.coreorder.application.command.RetrieveOrderQuery;
-import com.coreorder.application.dto.OrderDto;
-import com.coreorder.application.service.OrderService;
-import com.coreorder.domain.model.valueobject.PassengerType;
-import com.coreorder.presentation.request.CreateOrderRequest;
-import com.coreorder.presentation.response.OrderResponse;
-
-import jakarta.validation.Valid;
+import java.time.LocalDate;
+import java.util.List;
 
 /**
  * REST controller for order management operations.
- * Provider-agnostic — consumers never know which provider fulfills the request.
+ * Exposes API endpoints using application commands and services.
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -40,8 +38,6 @@ public class OrderController {
 
     /**
      * Create a new order.
-     * <p>
-     * POST /api/v1/orders
      */
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(
@@ -56,8 +52,6 @@ public class OrderController {
 
     /**
      * Retrieve an existing order.
-     * <p>
-     * GET /api/v1/orders/{orderId}
      */
     @GetMapping("/{orderId}")
     public ResponseEntity<OrderResponse> retrieveOrder(
@@ -72,8 +66,6 @@ public class OrderController {
 
     /**
      * Cancel an existing order.
-     * <p>
-     * DELETE /api/v1/orders/{orderId}
      */
     @DeleteMapping("/{orderId}")
     public ResponseEntity<OrderResponse> cancelOrder(
@@ -87,8 +79,6 @@ public class OrderController {
 
     /**
      * Get available order management providers.
-     * <p>
-     * GET /api/v1/orders/providers
      */
     @GetMapping("/providers")
     public ResponseEntity<List<String>> getAvailableProviders() {
@@ -101,7 +91,7 @@ public class OrderController {
                         p.firstName(),
                         p.lastName(),
                         LocalDate.parse(p.dateOfBirth()),
-                        PassengerType.valueOf(p.type().toUpperCase()),
+                        p.type(),
                         p.document() != null ? new CreateOrderCommand.PassengerData.DocumentData(
                                 p.document().type(),
                                 p.document().number(),
@@ -112,7 +102,7 @@ public class OrderController {
                 .toList();
 
         var payment = new CreateOrderCommand.PaymentData(
-                request.payment().method().toUpperCase(),
+                request.payment().method(),
                 request.payment().cardNumber(),
                 request.payment().cardHolderName(),
                 request.payment().expiryMonth(),

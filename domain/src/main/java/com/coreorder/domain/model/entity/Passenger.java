@@ -1,9 +1,9 @@
 package com.coreorder.domain.model.entity;
 
+import com.coreorder.domain.model.valueobject.PassengerType;
+
 import java.time.LocalDate;
 import java.util.Objects;
-
-import com.coreorder.domain.model.valueobject.PassengerType;
 
 /**
  * A passenger in an order. Immutable domain entity.

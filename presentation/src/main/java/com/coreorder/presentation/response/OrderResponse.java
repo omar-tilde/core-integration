@@ -1,10 +1,8 @@
 package com.coreorder.presentation.response;
 
-import com.coreorder.application.dto.OrderDto;
+import com.coreorder.application.order.OrderDto;
 
 /**
- * REST response model for order operations.
+ * REST response payload wrapping an order DTO.
  */
-public record OrderResponse(
-        OrderDto order
-) {}
+public record OrderResponse(OrderDto order) {}

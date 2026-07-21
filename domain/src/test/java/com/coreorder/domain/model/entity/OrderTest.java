@@ -1,13 +1,5 @@
 package com.coreorder.domain.model.entity;
 
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
 import com.coreorder.domain.model.enums.OrderStatus;
 import com.coreorder.domain.model.valueobject.AirlineCode;
 import com.coreorder.domain.model.valueobject.AirportCode;
@@ -16,6 +8,13 @@ import com.coreorder.domain.model.valueobject.CabinClass;
 import com.coreorder.domain.model.valueobject.FlightNumber;
 import com.coreorder.domain.model.valueobject.Money;
 import com.coreorder.domain.model.valueobject.PassengerType;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

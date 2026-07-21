@@ -1,14 +1,13 @@
 package com.coreorder.domain.model.entity;
 
-import java.time.LocalDateTime;
-
-import org.junit.jupiter.api.Test;
-
 import com.coreorder.domain.model.valueobject.AirlineCode;
 import com.coreorder.domain.model.valueobject.AirportCode;
 import com.coreorder.domain.model.valueobject.BookingClass;
 import com.coreorder.domain.model.valueobject.CabinClass;
 import com.coreorder.domain.model.valueobject.FlightNumber;
+import org.junit.jupiter.api.Test;
+
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
