@@ -7,12 +7,12 @@
 
     <parent>
         <groupId>com.core.service</groupId>
-        <artifactId>core-integration-parent</artifactId>
+        <artifactId>parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>application</artifactId>
-    <name>Core Integration - Application</name>
+    <name>application</name>
     <description>
         Application layer — use cases, commands, queries, DTOs, mappers and the provider router.
         Depends on the domain only (plus a thin slice of Spring for DI).
@@ -23,6 +23,7 @@
             <groupId>com.core.service</groupId>
             <artifactId>domain</artifactId>
         </dependency>
+
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>

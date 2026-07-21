@@ -7,12 +7,12 @@
 
     <parent>
         <groupId>com.core.service</groupId>
-        <artifactId>core-integration-parent</artifactId>
+        <artifactId>parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>main</artifactId>
-    <name>Core Integration - Main</name>
+    <name>main</name>
     <description>
         Spring Boot entry point — wires all layers together and produces the executable
         bootable JAR. Composes the domain, application, infrastructure and presentation modules.

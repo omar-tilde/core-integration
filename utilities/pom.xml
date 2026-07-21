@@ -7,12 +7,12 @@
 
     <parent>
         <groupId>com.core.service</groupId>
-        <artifactId>core-integration-parent</artifactId>
+        <artifactId>parent</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>utilities</artifactId>
-    <name>Core Integration - Utilities</name>
+    <name>utilities</name>
     <description>
         Cross-cutting, framework-light utilities (logging, string and date helpers)
         shared by every module in the Core Integration platform.
