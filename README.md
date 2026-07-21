@@ -16,20 +16,20 @@
 
 - 🔌 **Plug-in provider model** — Travelport and Amadeus ship today;
   adding Sabre/Navitaire/direct NDC is a one-package operation.
-- 🧱 **Clean / Hexagonal architecture** — the domain has **zero**
-  framework dependencies, the application layer orchestrates use cases,
-  the infrastructure layer talks to the outside world, and the
-  presentation layer is the only thing that exposes HTTP.
+- 🧱 **Hexagonal / clean architecture** — the `domain` is framework-free, the
+  `application` layer orchestrates use cases, the `infrastructure` layer talks to
+  the outside world, and the `presentation` layer is the only thing that
+  exposes HTTP.
 - 🛡️ **Provider-agnostic REST contract** — the API never leaks
   provider-specific fields; the `providerId` is the only traceability hook.
 - ✅ **Battle-tested validation** — Jakarta Validation at the boundary,
   invariant enforcement in the domain layer.
-- 🔐 **API key authentication** — every application endpoint requires a
-  valid API key; only a small public allow-list (`/actuator/health`,
+- 🔐 **API-key authentication** — every application endpoint requires a valid
+  API key; only a small public allow-list (`/actuator/health`,
   `/actuator/info`, `/error`) stays open.
 - 🎯 **Explicit provider selection** — requests use only the provider they
-  name and fail fast when it is missing, disabled, or unresolvable. There is
-  no silent fallback to another provider.
+  name and fail fast (404 / 503) when it is missing or disabled. There is no
+  silent fallback to another provider.
 - 🧰 **Shared utilities module** — logging, string and date helpers are
   available to every module.
 - 📝 **Structured logging (Log4j2)** — every line can carry a `correlationId`
@@ -42,24 +42,23 @@
 
 ## 🧰 Tech stack
 
-| Layer        | Technology                                                |
-|--------------|-----------------------------------------------------------|
-| Language     | **Java 25** (records, pattern matching)                   |
-| Framework    | **Spring Boot 4.0.7** + Spring Framework 7                |
-| Web          | `spring-boot-starter-webmvc` (Tomcat 11)                  |
-| Reactive     | `spring-boot-starter-webflux` (WebClient)                 |
-| Security     | `spring-boot-starter-security` (Spring Security 7)        |
-| Validation   | Jakarta Validation 3.1                                    |
-| Logging      | Apache **Log4j2** (via `spring-boot-starter-log4j2`)      |
-| JSON         | Jackson 3 (managed by Spring Boot 4)                      |
-| Build        | Maven 3.9+ (multi-module)                                 |
-| Test         | JUnit 5.11, AssertJ 3.26, Mockito 5.18, Spring Boot Test  |
-| Container    | `eclipse-temurin:25-jre`                                  |
+| Layer        | Technology                                                                 |
+|--------------|----------------------------------------------------------------------------|
+| Language     | **Java 25** (records, pattern matching)                                    |
+| Framework    | **Spring Boot 4.0.7** + Spring Framework 7                                 |
+| Web          | `spring-boot-starter-webmvc` (Tomcat 11)                                   |
+| Reactive     | `spring-boot-starter-webflux` (WebClient, used by provider clients)         |
+| Security     | `spring-boot-starter-security` (Spring Security 7)                         |
+| Validation   | Jakarta Validation 3.1                                                     |
+| Logging      | Apache **Log4j2** (via `spring-boot-starter-log4j2`)                       |
+| JSON         | Jackson 3 (`tools.jackson.databind`)                                       |
+| Build        | Maven 3.9+ (multi-module)                                                  |
+| Test         | JUnit 5.11, AssertJ 3.26, Mockito 5.18                                     |
+| Container    | `eclipse-temurin:25-jre`                                                  |
 
-> **Maven coordinates.** The project `groupId` is **`com.core.service`** and the
-> module `artifactId`s are **`main`**, **`application`**, **`domain`**,
-> **`presentation`**, **`infrastructure`** and **`utilities`**. Java packages
-> are **`com.core.service.*`**, matching the Maven `groupId`.
+> **Maven coordinates.** `groupId` = **`com.core.service`**; `artifactId`s =
+> **`main`**, **`application`**, **`domain`**, **`presentation`**,
+> **`infrastructure`**, **`utilities`**. Java packages are **`com.core.service.*`**.
 
 ---
 
@@ -68,40 +67,42 @@
 ```text
 core-integration/
 ├── utilities/          # Cross-cutting helpers: logging (Log4j2), string, date
-├── domain/             # Pure Java: entities, value objects, enums, ports
+├── domain/             # Pure Java: entities, value objects, enums, outbound ports
 ├── application/        # Use cases, commands, DTOs, mappers, router, services
 ├── infrastructure/     # Provider adapters (Travelport, Amadeus) + config
 ├── presentation/       # REST controllers, request/response, exception handler, HTTP security
 └── main/               # @SpringBootApplication + application.yml (composition root)
 ```
 
-The dependency graph is strictly **inward**, and every module also depends on
-`utilities`:
+The dependency graph points **inward** to `domain` (and `utilities`), and `main`
+is the composition root that wires everything at runtime:
 
 ```text
-                 utilities  ◀───────────────────────────────┐
-                    ▲     ▲     ▲     ▲     ▲                │
-                    │     │     │     │     │                │
-   main ─▶ presentation ─▶ application ─▶ domain            │
-       └────────────────▶ infrastructure ─┘                 │
-                                                         (utilities used by all)
+                 main  (scans com.core.service, wires beans)
+                  │
+   ┌──────────────┼──────────────────────────────────┐
+   ▼              ▼                                   ▼
+presentation   application ─────▶ domain ◀──────── infrastructure
+   │              │                      ▲                   │
+   └────▶ utilities ◀──────────────────┴───────────────────┘
+            (used by every module)
 ```
 
 ### Request flow
 
 ```text
-Client ──▶ ApiKeyAuthenticationFilter ──▶ Controller ──▶ Application Service
-                                                              │
-                                   ProviderRouter.resolve*(providerId)  (explicit, fail-fast)
-                                                              │
-                                                   Provider Adapter (Travelport / Amadeus)
-                                                              │
-                                                  Domain (invariants enforced)
-                                                              │
-                                              Response ◀── mapped DTOs  (errors → RFC 7807 JSON)
+Client ─▶ ApiKeyAuthenticationFilter ─▶ Controller ─▶ Application Service
+                                                       │
+                            ProviderRouter.resolve*(providerId)  (explicit, fail-fast)
+                                                       │
+                                            Provider Adapter (Travelport / Amadeus)
+                                                       │
+                                           Domain objects (invariants enforced)
+                                                       │
+                                 Response ◀── mapped DTOs  (errors → ErrorResponse JSON)
 ```
 
-> 📘 For a deep dive, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
+> 📘 For the deep dive, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ---
 
@@ -109,11 +110,11 @@ Client ──▶ ApiKeyAuthenticationFilter ──▶ Controller ──▶ Appli
 
 ### Prerequisites
 
-| Tool         | Version       | Notes                                       |
-|--------------|---------------|---------------------------------------------|
-| JDK          | **25**        | `java -version` must report 25+              |
-| Maven        | **3.9+**      | `mvn -version`                              |
-| Docker       | 24+ (optional)| only required for the container workflow     |
+| Tool         | Version | Notes                                       |
+|--------------|---------|---------------------------------------------|
+| JDK          | **25**  | `java -version` must report 25+              |
+| Maven        | **3.9+**| `mvn -version`                              |
+| Docker       | 24+ (optional) | only required for the container workflow  |
 
 ### Build
 
@@ -121,8 +122,8 @@ Client ──▶ ApiKeyAuthenticationFilter ──▶ Controller ──▶ Appli
 mvn clean verify
 ```
 
-This compiles every module, runs all unit tests, and produces the bootable
-JAR at `main/target/core-integration-*.jar`.
+Compiles every module, runs all unit tests, and produces the bootable JAR at
+`main/target/core-integration-*.jar`.
 
 ### Run locally
 
@@ -130,14 +131,14 @@ JAR at `main/target/core-integration-*.jar`.
 # Set the API key the service will require on every protected endpoint
 export API_KEY=dev-only-change-me
 
-# Either from the JAR:
+# From the JAR:
 java -jar main/target/core-integration-*.jar
 
 # Or directly from Maven:
 mvn -pl main spring-boot:run
 ```
 
-The service listens on **port 8080** by default. Health is public:
+The service listens on **port 8080**. Health is public:
 
 ```bash
 curl -s http://localhost:8080/actuator/health | jq
@@ -155,18 +156,18 @@ docker run --rm -p 8080:8080 -e API_KEY=dev-only-change-me core-integration:1.0.
 ## ⚙️ Configuration
 
 All runtime configuration is in `main/src/main/resources/application.yml`.
-The most relevant knobs are:
+The most relevant knobs:
 
-| Property                          | Default                                   | Purpose                                      |
-|-----------------------------------|-------------------------------------------|----------------------------------------------|
-| `server.port`                     | `8080`                                    | HTTP listen port                             |
-| `providers.travelport.enabled`    | `true`                                    | Toggle the Travelport adapter                |
-| `providers.amadeus.enabled`       | `true`                                    | Toggle the Amadeus adapter                   |
-| `providers.travelport.base-url`   | `https://api.travelport.com/universal`    | Travelport endpoint                          |
-| `providers.amadeus.base-url`      | `https://api.amadeus.com/v2`              | Amadeus endpoint                             |
-| `api.key`                         | `${API_KEY:dev-only-change-me}`           | API key required on protected endpoints      |
-| `api.header-name`                 | `${API_HEADER_NAME:X-API-KEY}`            | Request header that carries the API key      |
-| `management.endpoints.web.exposure.include` | `health,info,metrics`           | Actuator endpoints exposed                   |
+| Property                          | Default                                   | Purpose                                       |
+|-----------------------------------|-------------------------------------------|-----------------------------------------------|
+| `server.port`                     | `8080`                                    | HTTP listen port                              |
+| `providers.travelport.enabled`    | `true`                                    | Toggle the Travelport client + adapters       |
+| `providers.amadeus.enabled`       | `true`                                    | Toggle the Amadeus client + adapters          |
+| `providers.travelport.base-url`   | `https://api.travelport.com/universal`    | Travelport endpoint                           |
+| `providers.amadeus.base-url`      | `https://api.amadeus.com/v2`              | Amadeus endpoint                              |
+| `api.key`                         | `${API_KEY:dev-only-change-me}`           | API key required on protected endpoints       |
+| `api.header-name`                 | `${API_HEADER_NAME:X-API-KEY}`            | Request header that carries the API key       |
+| `management.endpoints.web.exposure.include` | `health,info,metrics`           | Actuator endpoints exposed                    |
 
 Provider credentials are read from environment variables (with empty defaults
 suitable for the in-memory mock clients):
@@ -181,15 +182,14 @@ export AMADEUS_CLIENT_SECRET=...
 
 ---
 
-## 🔐 API key authentication
+## 🔐 API-key authentication
 
 Every application endpoint is protected by a shared API key:
 
-- The key is sent in the `X-API-KEY` header (configurable via `api.header-name`
-  / `API_HEADER_NAME`).
-- The expected key is read from `api.key`, which binds from the `API_KEY`
-  environment variable (or `application.yml`). It is **never** hard-coded in
-  Java.
+- The key is sent in the `X-API-KEY` header (configurable via `api.header-name` /
+  `API_HEADER_NAME`).
+- The expected key is read from `api.key`, bound from the `API_KEY` environment
+  variable (or `application.yml`). It is **never** hard-coded in Java.
 - A valid key establishes an authenticated request; missing or invalid keys are
   rejected with **401 Unauthorized** and a JSON `ErrorResponse`. Forbidden
   accesses return **403 Forbidden**.
@@ -214,43 +214,42 @@ curl -s -X POST http://localhost:8080/api/v1/flights/search \
 ## 📝 Logging (Log4j2)
 
 The application logs through a **single Log4j2 backend**. `LogUtils` (in the
-`utilities` module) is built directly on the Log4j2 API, and the runnable `main`
-module uses `spring-boot-starter-log4j2` (Logback is excluded) so SLF4J calls are
-bridged to Log4j2.
+`utilities` module) is built directly on the Log4j2 API, and `main` uses
+`spring-boot-starter-log4j2` (Logback is excluded) so SLF4J calls are bridged to
+Log4j2.
 
-`LogUtils.putCorrelationId(...)` / `clearCorrelationId()` store the correlation id in
-Log4j2's `ThreadContext`, and the console pattern in
+`LogUtils.putCorrelationId(...)` / `clearCorrelationId()` store the correlation id
+in Log4j2's `ThreadContext`, and the console pattern in
 `utilities/src/main/resources/log4j2.xml` surfaces it on every line:
 
 ```text
 %d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%t] [%X{correlationId}] %logger{36} - %msg%n
 ```
 
-Set a correlation id early in request handling to trace a single call across modules.
+Set a correlation id early in request handling to trace a single call across
+modules.
 
 ---
 
 ## 🌐 HTTP API (v1)
 
-All endpoints return JSON. Errors follow an
-[RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807)-style
-`ErrorResponse` with `type`, `title`, `status`, `detail`, `path`,
-`timestamp` and an optional `errors[]` array (each `errors[]` entry has `field`
-and `message`). Every endpoint except the public actuator paths requires the
-`X-API-KEY` header.
+All endpoints return JSON. Errors follow an [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807)-style
+`ErrorResponse` (`type`, `title`, `status`, `detail`, `path`, `timestamp`, optional
+`errors[]`). **Every endpoint except the public actuator paths requires the
+`X-API-KEY` header.**
 
 ### `POST /api/v1/flights/search`
 
 Search for available flights. `preferredProvider` is **required** — the request
-fails immediately if it is missing, unknown, or points to a disabled provider.
+fails immediately (400) if it is missing, unknown, or points to a disabled provider.
 
 ### `GET /api/v1/flights/providers`
 
-List the providers currently enabled for flight search.
+List the provider ids currently enabled for flight search.
 
 ### `POST /api/v1/orders`
 
-Create an order from a previously searched offer. `providerId` is required.
+Create an order from a previously searched offer. `providerId` is **required**.
 
 ### `GET /api/v1/orders/{orderId}?providerId=AMADEUS`
 
@@ -258,45 +257,38 @@ Retrieve an order by id. `providerId` is **required**.
 
 ### `DELETE /api/v1/orders/{orderId}?providerId=AMADEUS`
 
-Cancel an order. `providerId` is required.
+Cancel an order. `providerId` is **required**.
 
 ### `GET /api/v1/orders/providers`
 
-List the providers currently enabled for order management.
+List the provider ids currently enabled for order management.
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Run every test in every module
-mvn test
-
-# Run only the domain tests (pure Java, no Spring context)
-mvn -pl domain test
-
-# Run only the presentation slice tests (controllers + security)
-mvn -pl presentation test
+mvn test                 # every module
+mvn -pl domain test      # a single module
+mvn -pl presentation test # controllers + security slice
 ```
-
-Test layout:
 
 | Module          | Coverage focus                                                        |
 |-----------------|-----------------------------------------------------------------------|
-| `utilities/`    | Pure JUnit + AssertJ for the shared logging/string/date helpers       |
-| `domain/`       | Pure JUnit + AssertJ. Validates invariants on entities & value objects |
-| `application/`  | Router resolution logic, application service orchestration            |
-| `infrastructure/` | Adapter mapping, mock-client behaviour                              |
-| `presentation/` | `@SpringBootTest` + `@AutoConfigureMockMvc` for controllers, global exception handler **and** API-key security |
+| `utilities/`    | Plain JUnit + AssertJ for the shared logging/string/date helpers       |
+| `domain/`       | Plain JUnit + AssertJ. Validates invariants on entities & value objects |
+| `application/`  | `ProviderRouter` resolution/fail-fast; service orchestration            |
+| `infrastructure/` | Adapter mapping; mock-client behaviour                              |
+| `presentation/` | `@WebMvcTest` (controllers) + `@SpringBootTest`/`@AutoConfigureMockMvc` (API-key security) |
 | `main/`         | `@SpringBootTest` context load (composition-root smoke test)           |
 
 ---
 
 ## 🏗️ Adding a new provider
 
-> Full recipe lives in [`ARCHITECTURE.md` §6.3](ARCHITECTURE.md).
+> Full recipe lives in [`ARCHITECTURE.md` §6.2](ARCHITECTURE.md).
 
-1. Add a flag to `application.yml`:
+1. Add a flag (and any other `providers.<id>.*` properties) to `application.yml`:
    ```yaml
    providers:
      sabre:
@@ -304,21 +296,20 @@ Test layout:
        base-url: https://api.sabre.com
        ...
    ```
-2. Create `SabreProperties` (`@ConfigurationProperties`).
-3. Create `SabreClient` + three adapters implementing the three outbound ports
-   in `domain/port/out/`, each annotated with
+2. Create `SabreProperties` as a `@ConfigurationProperties(prefix = "providers.sabre")` record.
+3. Create `SabreClient` (transport) and three adapters implementing the three
+   outbound ports in `domain/port/out/`, each annotated with
    `@ConditionalOnProperty(prefix = "providers.sabre", name = "enabled", havingValue = "true")`.
-4. Done — `ProviderRouter` picks them up at boot, the REST API starts listing
-   `"SABRE"` in `/providers`, and the rest of the system is unaware anything
-   happened.
+4. Done — `main`'s component scan picks the beans up, `ProviderRouter` registers
+   them, and the REST API starts listing `"SABRE"` in `/providers`.
 
 ---
 
 ## 🧭 Project governance
 
-- **Architecture document:** [`ARCHITECTURE.md`](ARCHITECTURE.md) is the
-  single source of truth. If code drifts, fix the code, then update the
-  document in the same commit.
+- **Architecture document:** [`ARCHITECTURE.md`](ARCHITECTURE.md) is the single
+  source of truth. If code drifts, fix the code, then update the document in the
+  same commit.
 - **Versioning:** this project follows [SemVer](https://semver.org/).
 - **License:** Apache 2.0.
 
