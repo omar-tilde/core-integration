@@ -1,4 +1,4 @@
-package com.core.service.utilities.string;
+package com.core.service.util.string;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;

@@ -1,8 +1,8 @@
-package com.core.service.utilities;
+package com.core.service.util;
 
-import com.core.service.utilities.date.DateUtils;
-import com.core.service.utilities.logging.LogUtils;
-import com.core.service.utilities.string.StringUtils;
+import com.core.service.util.date.DateUtils;
+import com.core.service.util.logging.LogUtils;
+import com.core.service.util.string.StringUtils;
 import org.apache.logging.log4j.ThreadContext;
 import org.junit.jupiter.api.Test;
 

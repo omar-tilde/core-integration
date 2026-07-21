@@ -1,4 +1,4 @@
-package com.core.service.utilities.logging;
+package com.core.service.util.logging;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

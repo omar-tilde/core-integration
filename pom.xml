@@ -26,7 +26,7 @@
     </description>
 
     <modules>
-        <module>utilities</module>
+        <module>util</module>
         <module>domain</module>
         <module>application</module>
         <module>infrastructure</module>
@@ -78,7 +78,7 @@
             </dependency>
             <dependency>
                 <groupId>com.core.service</groupId>
-                <artifactId>utilities</artifactId>
+                <artifactId>util</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

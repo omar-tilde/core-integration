@@ -30,7 +30,7 @@
 - 🎯 **Explicit provider selection** — requests use only the provider they
   name and fail fast (404 / 503) when it is missing or disabled. There is no
   silent fallback to another provider.
-- 🧰 **Shared utilities module** — logging, string and date helpers are
+- 🧰 **Shared util module** — logging, string and date helpers are
   available to every module.
 - 📝 **Structured logging (Log4j2)** — every line can carry a `correlationId`
   through `LogUtils`, so a single request is traceable across modules.
@@ -58,7 +58,7 @@
 
 > **Maven coordinates.** `groupId` = **`com.core.service`**; `artifactId`s =
 > **`main`**, **`application`**, **`domain`**, **`presentation`**,
-> **`infrastructure`**, **`utilities`**. Java packages are **`com.core.service.*`**.
+> **`infrastructure`**, **`util`**. Java packages are **`com.core.service.*`**.
 
 ---
 
@@ -66,7 +66,7 @@
 
 ```text
 core-integration/
-├── utilities/          # Cross-cutting helpers: logging (Log4j2), string, date
+├── util/          # Cross-cutting helpers: logging (Log4j2), string, date
 ├── domain/             # Pure Java: entities, value objects, enums, outbound ports
 ├── application/        # Use cases, commands, DTOs, mappers, router, services
 ├── infrastructure/     # Provider adapters (Travelport, Amadeus) + config
@@ -74,17 +74,17 @@ core-integration/
 └── main/               # @SpringBootApplication + application.yml (composition root)
 ```
 
-The dependency graph points **inward** to `domain` (and `utilities`), and `main`
+The dependency graph points **inward** to `domain` (and `util`), and `main`
 is the composition root that wires everything at runtime:
 
 ```text
                  main  (scans com.core.service, wires beans)
                   │
-   ┌──────────────┼──────────────────────────────────┐
+   ┌──────────────┼───────────────────────────────────┐
    ▼              ▼                                   ▼
 presentation   application ─────▶ domain ◀──────── infrastructure
-   │              │                      ▲                   │
-   └────▶ utilities ◀──────────────────┴───────────────────┘
+   │              │                      │                   │
+   └────▶ util ◀─┴──────────────────────┴───────────────────┘
             (used by every module)
 ```
 
@@ -214,13 +214,13 @@ curl -s -X POST http://localhost:8080/api/v1/flights/search \
 ## 📝 Logging (Log4j2)
 
 The application logs through a **single Log4j2 backend**. `LogUtils` (in the
-`utilities` module) is built directly on the Log4j2 API, and `main` uses
+`util` module) is built directly on the Log4j2 API, and `main` uses
 `spring-boot-starter-log4j2` (Logback is excluded) so SLF4J calls are bridged to
 Log4j2.
 
 `LogUtils.putCorrelationId(...)` / `clearCorrelationId()` store the correlation id
 in Log4j2's `ThreadContext`, and the console pattern in
-`utilities/src/main/resources/log4j2.xml` surfaces it on every line:
+`util/src/main/resources/log4j2.xml` surfaces it on every line:
 
 ```text
 %d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%t] [%X{correlationId}] %logger{36} - %msg%n
@@ -275,7 +275,7 @@ mvn -pl presentation test # controllers + security slice
 
 | Module          | Coverage focus                                                        |
 |-----------------|-----------------------------------------------------------------------|
-| `utilities/`    | Plain JUnit + AssertJ for the shared logging/string/date helpers       |
+| `util/`    | Plain JUnit + AssertJ for the shared logging/string/date helpers       |
 | `domain/`       | Plain JUnit + AssertJ. Validates invariants on entities & value objects |
 | `application/`  | `ProviderRouter` resolution/fail-fast; service orchestration            |
 | `infrastructure/` | Adapter mapping; mock-client behaviour                              |

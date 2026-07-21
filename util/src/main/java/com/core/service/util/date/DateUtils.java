@@ -1,4 +1,4 @@
-package com.core.service.utilities.date;
+package com.core.service.util.date;
 
 import java.time.Instant;
 import java.time.LocalDate;

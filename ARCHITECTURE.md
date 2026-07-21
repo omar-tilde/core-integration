@@ -48,7 +48,7 @@ and the modules' POMs.
 
 > **Maven coordinates.** `groupId` = **`com.core.service`**; `artifactId`s =
 > **`main`**, **`application`**, **`domain`**, **`presentation`**,
-> **`infrastructure`**, **`utilities`**. Java packages are
+> **`infrastructure`**, **`util`**. Java packages are
 > **`com.core.service.*`**, matching the `groupId`.
 
 ---
@@ -59,7 +59,7 @@ The reactor (parent POM `<modules>`) is, in build order:
 
 ```text
 core-integration/                       (parent POM — groupId com.core.service)
-├── utilities/          (cross-cutting helpers — logging, string, date)
+├── util/          (cross-cutting helpers — logging, string, date)
 ├── domain/             (innermost layer — pure Java, framework-free)
 ├── application/        (use cases, depends on domain + Spring context)
 ├── infrastructure/     (provider adapters, depends on domain + web/webflux)
@@ -73,12 +73,12 @@ Taken verbatim from each module's `<dependencies>`:
 
 | Module             | Declared dependencies (compile)                                                        |
 |--------------------|----------------------------------------------------------------------------------------|
-| **utilities**      | `log4j-api`, `log4j-core`                                                              |
-| **domain**         | `lombok` (provided), `utilities`                                                       |
-| **application**    | `domain`, `spring-context`, `spring-tx`, `utilities`, `lombok` (provided)              |
-| **infrastructure** | `domain`, `spring-boot-starter-webmvc`, `spring-boot-starter-webflux`, `utilities`, `spring-boot-configuration-processor`, `lombok` (provided) |
-| **presentation**   | `application`, `spring-boot-starter-webmvc`, `spring-boot-starter-security`, `utilities`, `spring-boot-starter-validation`, `lombok` (provided) |
-| **main**           | `domain`, `application`, `infrastructure`, `presentation`, `utilities`, `spring-boot-starter-webmvc` (logging excluded), `spring-boot-starter-actuator` (logging excluded), `spring-boot-starter-log4j2`, `lombok` (provided) |
+| **util**      | `log4j-api`, `log4j-core`                                                              |
+| **domain**         | `lombok` (provided), `util`                                                       |
+| **application**    | `domain`, `spring-context`, `spring-tx`, `util`, `lombok` (provided)              |
+| **infrastructure** | `domain`, `spring-boot-starter-webmvc`, `spring-boot-starter-webflux`, `util`, `spring-boot-configuration-processor`, `lombok` (provided) |
+| **presentation**   | `application`, `spring-boot-starter-webmvc`, `spring-boot-starter-security`, `util`, `spring-boot-starter-validation`, `lombok` (provided) |
+| **main**           | `domain`, `application`, `infrastructure`, `presentation`, `util`, `spring-boot-starter-webmvc` (logging excluded), `spring-boot-starter-actuator` (logging excluded), `spring-boot-starter-log4j2`, `lombok` (provided) |
 
 Two facts worth calling out, because they are easy to get wrong:
 
@@ -97,17 +97,17 @@ Two facts worth calling out, because they are easy to get wrong:
                  main  (composition root: @SpringBootApplication, scans com.core.service)
                   │  discovers & wires every @Component/@Service/@Configuration/@RestController
                   │
-   ┌──────────────┼───────────────────────────────────────────────┐
+   ┌──────────────┼────────────────────────────────────────────────┐
    │              │                                                │
    ▼              ▼                                                ▼
 presentation   application ─────────────▶ domain ◀──────── infrastructure
-   │              │                      ▲                      │
-   │              │                      │                      │
-   └──────▶ utilities ◀────────────────┴──────────────────────┘
+   │              │                         │                      │
+   │              │                         │                      │
+   └──────▶ util ◀─────────────────────────┴──────────────────────┘
             (used by every module; depends only on Log4j2)
 ```
 
-At **compile time** the arrows point inward to `domain` (and `utilities`). At
+At **compile time** the arrows point inward to `domain` (and `util`). At
 **runtime**, `main` performs the wiring: its component scan over `com.core.service`
 picks up the infrastructure adapters (which implement `domain` ports) and injects
 them into `application`'s `ProviderRouter`. This keeps the layers decoupled while
@@ -119,7 +119,7 @@ letting Spring assemble the full object graph at the composition root.
 
 The domain models the **life-cycle of a flight order** in provider-agnostic terms.
 It is pure Java — no Spring, no Jackson, no JPA. `domain` depends only on
-`utilities` (for helpers) and Lombok.
+`util` (for helpers) and Lombok.
 
 ```text
 domain/
@@ -413,16 +413,16 @@ api:
 
 ---
 
-## 9. Utilities module
+## 9. util module
 
-`utilities` is a framework-light, reusable helper library, depended on by every
+`util` is a framework-light, reusable helper library, depended on by every
 module. It depends only on Apache Log4j2 (`log4j-api` + `log4j-core`).
 
 | Class        | Package                          | Helpers                                                              |
 |--------------|----------------------------------|----------------------------------------------------------------------|
-| `LogUtils`   | `com.core.service.utilities.logging`  | `forClass`, `forName`, `putCorrelationId` / `clearCorrelationId` (Log4j2 `ThreadContext`) |
-| `StringUtils`| `com.core.service.utilities.string`  | `isBlank`, `isNotBlank`, `defaultIfBlank`, `truncate`, `randomToken`, `toBase64` |
-| `DateUtils`  | `com.core.service.utilities.date`    | `nowUtc`, `todayUtc`, `formatIso`/`parseIso`, `formatDate`/`parseDate` |
+| `LogUtils`   | `com.core.service.util.logging`  | `forClass`, `forName`, `putCorrelationId` / `clearCorrelationId` (Log4j2 `ThreadContext`) |
+| `StringUtils`| `com.core.service.util.string`  | `isBlank`, `isNotBlank`, `defaultIfBlank`, `truncate`, `randomToken`, `toBase64` |
+| `DateUtils`  | `com.core.service.util.date`    | `nowUtc`, `todayUtc`, `formatIso`/`parseIso`, `formatDate`/`parseDate` |
 
 ### 9.1 Logging with Log4j2
 
@@ -436,7 +436,7 @@ The runnable `main` module uses `spring-boot-starter-log4j2` and **excludes**
 Log4j2 backend; SLF4J calls elsewhere (e.g. `GlobalExceptionHandler`) are bridged
 to Log4j2 via `log4j-slf4j2-impl`.
 
-The Log4j2 configuration lives in `utilities/src/main/resources/log4j2.xml`:
+The Log4j2 configuration lives in `util/src/main/resources/log4j2.xml`:
 
 ```xml
 <Configuration status="WARN" name="CoreIntegration">
@@ -484,7 +484,7 @@ All runtime configuration is in `main/src/main/resources/application.yml`.
 | `logging.level.com.core.service`               | `INFO`                                | Log4j2 level for the application package           |
 
 > Note: `application.yml` also sets `logging.pattern.console`; that pattern is
-> superseded by the Log4j2 `PatternLayout` in `utilities/src/main/resources/log4j2.xml`,
+> superseded by the Log4j2 `PatternLayout` in `util/src/main/resources/log4j2.xml`,
 > which is the effective console layout.
 
 ---
@@ -494,14 +494,14 @@ All runtime configuration is in `main/src/main/resources/application.yml`.
 Tests are layered to match the architecture, so each module is verified at the
 narrowest scope that still proves its contract.
 
-| Module          | Style                                                        | Focus                                                                 |
-|-----------------|--------------------------------------------------------------|-----------------------------------------------------------------------|
-| `utilities/`    | Plain JUnit + AssertJ                                        | String/date helpers; `LogUtils` correlation id via Log4j2 `ThreadContext` |
-| `domain/`       | Plain JUnit + AssertJ                                        | Invariants on entities & value objects (continuity, chronology, IATA)   |
-| `application/`  | Plain JUnit + Mockito (no Spring context)                    | `ProviderRouter` resolution/fail-fast; service orchestration            |
+| Module            | Style                                                        | Focus                                                                 |
+|-------------------|--------------------------------------------------------------|-----------------------------------------------------------------------|
+| `util/`           | Plain JUnit + AssertJ                                        | String/date helpers; `LogUtils` correlation id via Log4j2 `ThreadContext` |
+| `domain/`         | Plain JUnit + AssertJ                                        | Invariants on entities & value objects (continuity, chronology, IATA)   |
+| `application/`    | Plain JUnit + Mockito (no Spring context)                    | `ProviderRouter` resolution/fail-fast; service orchestration            |
 | `infrastructure/` | Plain JUnit + Mockito                                      | Adapter mapping; mock-client behaviour                                 |
-| `presentation/` | `@WebMvcTest` (controllers) and `@SpringBootTest` + `@AutoConfigureMockMvc` (security) | Controllers, `GlobalExceptionHandler`, **API-key security** (downstream services mocked) |
-| `main/`         | `@SpringBootTest` (context load)                             | Composition-root smoke test — the fully wired app (incl. security) boots |
+| `presentation/`   | `@WebMvcTest` (controllers) and `@SpringBootTest` + `@AutoConfigureMockMvc` (security) | Controllers, `GlobalExceptionHandler`, **API-key security** (downstream services mocked) |
+| `main/`           | `@SpringBootTest` (context load)                             | Composition-root smoke test — the fully wired app (incl. security) boots |
 
 Run them with:
 
@@ -534,7 +534,7 @@ mvn -pl presentation test # controllers + security slice
 9. **API-key authentication at the edge** — a `OncePerRequestFilter` +
    `SecurityFilterChain` in the presentation layer protects every endpoint while
    leaving a small public allow-list open.
-10. **Shared utilities + single Log4j2 backend** — helpers live in one module and
+10. **Shared util + single Log4j2 backend** — helpers live in one module and
     the application logs through one consistent Log4j2 backend (Logback excluded).
 11. **Spring Boot 4.0.x baseline** — tracks the current LTS-grade Spring Boot line
     and follows Spring's recommended starter names.
