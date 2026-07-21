@@ -42,10 +42,11 @@ No changes to `domain/`, `application/` or `presentation/` are required.
 | Security           | Spring Security 7 (`spring-boot-starter-security`)       |
 | Validation         | Jakarta Validation 3.1 (`jakarta.*`)                   |
 | Configuration      | Spring Boot ConfigurationProperties + Records          |
+| Logging            | Apache **Log4j2** 2.25.4 (via `spring-boot-starter-log4j2`) |
+| JSON               | Jackson 3 (Spring Boot 4 default)                      |
 | Build              | Maven 3.9+ (multi-module)                              |
 | Test               | JUnit Jupiter 5.11 + AssertJ 3.26 + Mockito 5.18       |
 | Container          | `eclipse-temurin:25`                                  |
-| JSON               | Jackson 3 (Spring Boot 4 default)                      |
 
 > **Maven coordinates.** `groupId` is **`com.core.service`**; the module
 > `artifactId`s are **`main`**, **`application`**, **`domain`**,
@@ -78,18 +79,42 @@ core-integration/                       (parent POM — groupId com.core.service
 The arrows **always point inward**. The domain has **zero** dependencies on Spring,
 Jackson, Hibernate or any other framework. Adding a new framework dependency to
 `domain/pom.xml` is a build failure waiting to happen. `utilities` depends only on
-`slf4j-api` and is depended on by all other modules.
+Apache Log4j2 and is depended on by all other modules.
 
 ### 3.2 What lives where
 
 | Module             | Responsibility                                                                                   | Talks to                |
 |--------------------|--------------------------------------------------------------------------------------------------|-------------------------|
-| **utilities**      | Shared, framework-light helpers: `LogUtils`, `StringUtils`, `DateUtils`                            | nothing (slf4j-api only) |
+| **utilities**      | Shared, framework-light helpers: `LogUtils`, `StringUtils`, `DateUtils`                            | nothing (Log4j2 only)   |
 | **domain**         | Entities, value objects, enums, domain services, outbound ports                                  | nothing (pure Java)     |
 | **application**    | Use cases, commands, queries, DTOs, mappers, `ProviderRouter`, application services, exceptions  | `domain` only           |
 | **infrastructure** | Provider adapters (Travelport, Amadeus), their clients, configuration, exceptions                | `domain`, `application` |
 | **presentation**   | REST controllers, request/response DTOs, validation, global exception handler, API-key HTTP security | `application`, `domain` |
 | **main**           | `@SpringBootApplication` class, `application.yml`, executable JAR (composition root)            | all of the above        |
+
+### 3.3 Request lifecycle (example: `POST /api/v1/orders`)
+
+```text
+Client
+  │  POST /api/v1/orders        Header: X-API-KEY: <key>
+  ▼
+ApiKeyAuthenticationFilter      validates the key, sets the SecurityContext
+  ▼
+OrderController                 maps JSON → CreateOrderCommand (Jakarta-validated)
+  ▼
+OrderService                   orchestrates the use case, builds domain objects
+  ▼
+ProviderRouter.resolveOrderManagementProvider(providerId)
+  │                            explicit selection — fails fast if missing/disabled
+  ▼
+OrderManagementProvider adapter (Travelport / Amadeus)
+  │                            talks to the external GDS/NDC endpoint
+  ▼
+Domain (Order aggregate)       invariants enforced
+  ▼
+OrderResponse  ◀──────────────  mapped DTOs
+                                (GlobalExceptionHandler renders errors as RFC 7807 JSON)
+```
 
 ---
 
@@ -144,11 +169,11 @@ domain/
 The domain defines the contracts that the rest of the application depends on.
 The infrastructure module supplies one or more implementations per port.
 
-| Port                          | Purpose                                                          |
-|-------------------------------|------------------------------------------------------------------|
-| `FlightSearchProvider`        | Shop for flight offers based on `FlightSearchCriteria`           |
-| `OrderManagementProvider`     | Create / retrieve / cancel orders, capture payment intent        |
-| `PricingProvider`             | Re-price an offer for a specific passenger list                  |
+| Port                          | Purpose                                                          | Key method |
+|-------------------------------|------------------------------------------------------------------|------------|
+| `FlightSearchProvider`        | Shop for flight offers based on `FlightSearchCriteria`           | `searchFlights(...)` → `List<FlightOffer>` |
+| `OrderManagementProvider`     | Create / retrieve / cancel orders, capture payment intent        | `createOrder(OrderCreateRequest)`, `retrieveOrder(id)`, `cancelOrder(id)` |
+| `PricingProvider`             | Re-price an offer for a specific passenger list                  | `confirmPrice(offerId, passengers)` → `FlightOffer` |
 
 Every provider strategy implements `ProviderStrategy`, whose single status method is
 **`isEnabled()`** (the former `isAvailable()` / client `isReachable()` checks were
@@ -212,8 +237,8 @@ silently switching providers.
   `FlightOfferDto`. `preferredProvider` is mandatory.
 - `OrderService` orchestrates order creation, retrieval, and cancellation. It is the
   only place that converts a `CreateOrderCommand` (and its nested payment/passenger
-  data) into an `OrderCreateRequest` that the provider port can consume.
-  `providerId` is mandatory for create, retrieve and cancel.
+  data) into the provider port's `OrderCreateRequest`. `providerId` is mandatory for
+  create, retrieve and cancel.
 
 ---
 
@@ -283,8 +308,13 @@ presentation/
 │   ├── ErrorResponse.java
 │   ├── FlightSearchResponse.java
 │   └── OrderResponse.java
-└── exception/
-    └── GlobalExceptionHandler.java
+├── exception/
+│   └── GlobalExceptionHandler.java
+└── security/
+    ├── ApiKeyAuthenticationFilter.java
+    ├── ApiKeyProperties.java
+    ├── ApiKeySecurityConfig.java
+    └── ApiKeySecurityHandlers.java
 ```
 
 - Controllers are **thin**: they translate between HTTP DTOs and
@@ -293,9 +323,9 @@ presentation/
   annotations on the request records.
 - `GlobalExceptionHandler` converts known exceptions into a uniform
   `ErrorResponse` (RFC 7807-style). Unknown exceptions become `500`.
-- **HTTP security** (API-key authentication) is owned here too: the
+- **HTTP security** (API-key authentication) is owned here too — the
   `SecurityFilterChain` and its supporting filter/properties/handlers live in the
-  `presentation/security` package, so the web boundary — controllers and auth — are
+  `presentation/security` package, so the web boundary (controllers and auth) is
   colocated. See §8.1.
 
 ---
@@ -317,8 +347,34 @@ holds **no business or web logic of its own** — security included:
 HTTP security is an **interface-layer concern**, so it lives in the `presentation`
 module alongside the REST controllers — not in the entry point. This keeps `main` a
 pure composition root and lets the security filter chain be verified with a focused
-`@WebMvcTest` slice in the presentation module. The `presentation` module declares the
+test in the presentation module (`ApiKeySecurityTest`, a `@SpringBootTest` +
+`@AutoConfigureMockMvc` slice that wires the controllers and the filter chain together
+and mocks the downstream application services). The `presentation` module declares the
 `spring-boot-starter-security` dependency; `main` inherits it transitively.
+
+**Security filter chain flow**
+
+```text
+HTTP request
+   │
+   ▼
+SecurityFilterChain  (stateless, CSRF / form-login / basic-auth disabled)
+   │  authorizeHttpRequests:
+   │     /actuator/health, /actuator/info, /error  → permitAll
+   │     anyRequest                                  → authenticated
+   ▼
+ApiKeyAuthenticationFilter  (OncePerRequestFilter)
+   │  reads the configured header (default X-API-KEY)
+   │  ✓ matches api.key  → UsernamePasswordAuthenticationToken(ROLE_API)
+   │  ✗                  → leaves the request unauthenticated
+   ▼
+AuthorizationFilter
+   │  authenticated        → proceed to the controller
+   │  missing / invalid key → AuthenticationEntryPoint  → 401 JSON
+   │  authenticated, forbidden → AccessDeniedHandler   → 403 JSON
+   ▼
+Controller
+```
 
 - `presentation/security/ApiKeyAuthenticationFilter` reads the key from a configurable
   request header (default `X-API-KEY`) and, when it matches the configured `api.key`,
@@ -357,15 +413,104 @@ api:
 The module depends only on Apache Log4j2 (`log4j-api` + `log4j-core`, versions
 managed by the Spring Boot BOM) and is depended on by `domain`, `application`,
 `infrastructure`, `presentation` and `main`, so the helpers are available throughout
-the codebase without re-implementing them per module. `LogUtils` is built directly on
-the Log4j2 API; the runnable `main` module uses `spring-boot-starter-log4j2` so the
-whole application logs through one consistent Log4j2 backend (SLF4J calls are bridged
-via `log4j-slf4j2-impl`). A Log4j2 configuration lives in this module's
-`src/main/resources/log4j2.xml`.
+the codebase without re-implementing them per module.
+
+### 9.1 Logging with Log4j2
+
+`LogUtils` is built directly on the **Log4j2 API** (`LogManager` / `Logger`); the
+correlation id is stored in Log4j2's `ThreadContext` (its MDC equivalent) so it is
+attached to every line emitted during the current thread's processing.
+
+The runnable `main` module uses `spring-boot-starter-log4j2` and **excludes**
+`spring-boot-starter-logging`, so the whole application logs through one consistent
+Log4j2 backend. SLF4J calls elsewhere (e.g. `GlobalExceptionHandler`) are bridged to
+Log4j2 via `log4j-slf4j2-impl`.
+
+The Log4j2 configuration lives in this module's `src/main/resources/log4j2.xml`:
+
+```xml
+<Configuration status="WARN" name="CoreIntegration">
+    <Properties>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%t] [%X{correlationId}] %logger{36} - %msg%n</Property>
+    </Properties>
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Logger name="com.core.service" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>
+```
+
+Every line emitted by the application therefore carries the `correlationId` (when one
+has been set via `LogUtils.putCorrelationId(...)`), which makes tracing a single
+request across modules straightforward.
 
 ---
 
-## 10. Key design decisions
+## 10. Configuration reference
+
+All runtime configuration is in `main/src/main/resources/application.yml`.
+
+| Property                                       | Default                                | Purpose                                          |
+|------------------------------------------------|----------------------------------------|--------------------------------------------------|
+| `server.port`                                  | `8080`                                | HTTP listen port                                 |
+| `providers.<id>.enabled`                       | `true`                                 | Toggle a provider adapter in/out of the context  |
+| `providers.<id>.base-url`                      | provider-specific                      | Provider endpoint                                |
+| `providers.<id>.username` / `password` / …     | empty (in-memory mock clients)         | Provider credentials (env-injected)              |
+| `providers.<id>.connection-timeout-ms`        | `5000`                                 | HTTP client connect timeout                      |
+| `providers.<id>.read-timeout-ms`              | `30000`                                | HTTP client read timeout                         |
+| `api.key`                                      | `${API_KEY:dev-only-change-me}`        | API key required on protected endpoints          |
+| `api.header-name`                              | `${API_HEADER_NAME:X-API-KEY}`         | Request header that carries the API key          |
+| `management.endpoints.web.exposure.include`    | `health,info,metrics`                  | Actuator endpoints exposed                       |
+| `management.endpoint.health.show-details`      | `when-authorized`                      | Who may see full health details                  |
+| `logging.level.com.core.service`               | `INFO`                                 | Log4j2 level for the application package         |
+
+Provider credentials are read from environment variables (with empty defaults
+suitable for the in-memory mock clients):
+
+```bash
+export TRAVELPORT_USERNAME=...
+export TRAVELPORT_PASSWORD=...
+export TRAVELPORT_BRANCH_CODE=...
+export AMADEUS_CLIENT_ID=...
+export AMADEUS_CLIENT_SECRET=...
+```
+
+---
+
+## 11. Testing strategy
+
+Tests are layered to match the architecture, so each module is verified at the
+narrowest scope that still proves its contract.
+
+| Module          | Style                                            | What it proves                                                        |
+|-----------------|--------------------------------------------------|-----------------------------------------------------------------------|
+| `utilities/`    | Pure JUnit + AssertJ                             | String/date helpers; `LogUtils` correlation id via Log4j2 `ThreadContext` |
+| `domain/`       | Pure JUnit + AssertJ                             | Invariants on entities & value objects (continuity, chronology, IATA)  |
+| `application/`  | JUnit + Mockito (no Spring context)              | `ProviderRouter` resolution/fail-fast; service orchestration           |
+| `infrastructure/` | JUnit + Mockito                                | Adapter mapping; mock-client behaviour                                |
+| `presentation/` | `@SpringBootTest` + `@AutoConfigureMockMvc`      | Controllers, `GlobalExceptionHandler`, and **API-key security** end-to-end (downstream services mocked) |
+| `main/`         | `@SpringBootTest` (context load)                | Composition-root smoke test — the fully wired app (incl. security) boots |
+
+Run them with:
+
+```bash
+mvn test                 # every module
+mvn -pl domain test      # a single module
+mvn -pl presentation test # controllers + security slice
+```
+
+---
+
+## 12. Key design decisions
 
 1. **Multi-module Maven** — enforces the dependency direction at build time.
 2. **Port-Adapter (Hexagonal) architecture** — ports in domain, adapters in
@@ -382,18 +527,19 @@ via `log4j-slf4j2-impl`). A Log4j2 configuration lives in this module's
    (e.g. the `Order` aggregate root, which has a lifecycle).
 8. **Conditional provider registration** — disabling a provider removes
    it from the context cleanly (`@ConditionalOnProperty`).
-9. **API key authentication** — a simple, maintainable `OncePerRequestFilter` +
-   `SecurityFilterChain` protects every endpoint while leaving a small public
-   allow-list open.
+9. **API key authentication at the edge** — a simple, maintainable
+   `OncePerRequestFilter` + `SecurityFilterChain` in the presentation layer protects
+   every endpoint while leaving a small public allow-list open.
 10. **Shared utilities module** — logging/string/date helpers live in one place and
-    are reused project-wide, avoiding duplication.
+    are reused project-wide, avoiding duplication. `LogUtils` is built on Log4j2 and
+    the application logs through a single Log4j2 backend.
 11. **Spring Boot 4.0.x baseline** — the project tracks the current LTS-grade
     Spring Boot line and follows Spring's recommended starter names
     (`spring-boot-starter-webmvc`, `spring-boot-starter-webmvc-test`, …).
 
 ---
 
-## 11. Aviation domain glossary
+## 13. Aviation domain glossary
 
 | Term                | Meaning                                                                                |
 |---------------------|----------------------------------------------------------------------------------------|

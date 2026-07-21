@@ -32,6 +32,8 @@
   no silent fallback to another provider.
 - 🧰 **Shared utilities module** — logging, string and date helpers are
   available to every module.
+- 📝 **Structured logging (Log4j2)** — every line can carry a `correlationId`
+  through `LogUtils`, so a single request is traceable across modules.
 - 🩺 **Spring Boot Actuator** — `health`, `info`, `metrics` out of the box.
 - 🐳 **Production-grade container image** — multi-stage Dockerfile based on
   `eclipse-temurin:25`.
@@ -48,6 +50,7 @@
 | Reactive     | `spring-boot-starter-webflux` (WebClient)                 |
 | Security     | `spring-boot-starter-security` (Spring Security 7)        |
 | Validation   | Jakarta Validation 3.1                                    |
+| Logging      | Apache **Log4j2** (via `spring-boot-starter-log4j2`)      |
 | JSON         | Jackson 3 (managed by Spring Boot 4)                      |
 | Build        | Maven 3.9+ (multi-module)                                 |
 | Test         | JUnit 5.11, AssertJ 3.26, Mockito 5.18, Spring Boot Test  |
@@ -64,7 +67,7 @@
 
 ```text
 core-integration/
-├── utilities/          # Cross-cutting helpers: logging, string, date
+├── utilities/          # Cross-cutting helpers: logging (Log4j2), string, date
 ├── domain/             # Pure Java: entities, value objects, enums, ports
 ├── application/        # Use cases, commands, DTOs, mappers, router, services
 ├── infrastructure/     # Provider adapters (Travelport, Amadeus) + config
@@ -82,6 +85,20 @@ The dependency graph is strictly **inward**, and every module also depends on
    main ─▶ presentation ─▶ application ─▶ domain            │
        └────────────────▶ infrastructure ─┘                 │
                                                          (utilities used by all)
+```
+
+### Request flow
+
+```text
+Client ──▶ ApiKeyAuthenticationFilter ──▶ Controller ──▶ Application Service
+                                                              │
+                                   ProviderRouter.resolve*(providerId)  (explicit, fail-fast)
+                                                              │
+                                                   Provider Adapter (Travelport / Amadeus)
+                                                              │
+                                                  Domain (invariants enforced)
+                                                              │
+                                              Response ◀── mapped DTOs  (errors → RFC 7807 JSON)
 ```
 
 > 📘 For a deep dive, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
@@ -194,13 +211,33 @@ curl -s -X POST http://localhost:8080/api/v1/flights/search \
 
 ---
 
+## 📝 Logging (Log4j2)
+
+The application logs through a **single Log4j2 backend**. `LogUtils` (in the
+`utilities` module) is built directly on the Log4j2 API, and the runnable `main`
+module uses `spring-boot-starter-log4j2` (Logback is excluded) so SLF4J calls are
+bridged to Log4j2.
+
+`LogUtils.putCorrelationId(...)` / `clearCorrelationId()` store the correlation id in
+Log4j2's `ThreadContext`, and the console pattern in
+`utilities/src/main/resources/log4j2.xml` surfaces it on every line:
+
+```text
+%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%t] [%X{correlationId}] %logger{36} - %msg%n
+```
+
+Set a correlation id early in request handling to trace a single call across modules.
+
+---
+
 ## 🌐 HTTP API (v1)
 
 All endpoints return JSON. Errors follow an
 [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807)-style
 `ErrorResponse` with `type`, `title`, `status`, `detail`, `path`,
-`timestamp` and an optional `errors[]` array. Every endpoint except the public
-actuator paths requires the `X-API-KEY` header.
+`timestamp` and an optional `errors[]` array (each `errors[]` entry has `field`
+and `message`). Every endpoint except the public actuator paths requires the
+`X-API-KEY` header.
 
 ### `POST /api/v1/flights/search`
 
@@ -238,7 +275,7 @@ mvn test
 # Run only the domain tests (pure Java, no Spring context)
 mvn -pl domain test
 
-# Run only the presentation slice tests
+# Run only the presentation slice tests (controllers + security)
 mvn -pl presentation test
 ```
 
@@ -250,14 +287,14 @@ Test layout:
 | `domain/`       | Pure JUnit + AssertJ. Validates invariants on entities & value objects |
 | `application/`  | Router resolution logic, application service orchestration            |
 | `infrastructure/` | Adapter mapping, mock-client behaviour                              |
-| `presentation/` | `@WebMvcTest` slice tests for controllers, global exception handler and API-key security |
+| `presentation/` | `@SpringBootTest` + `@AutoConfigureMockMvc` for controllers, global exception handler **and** API-key security |
 | `main/`         | `@SpringBootTest` context load (composition-root smoke test)           |
 
 ---
 
 ## 🏗️ Adding a new provider
 
-> Full recipe lives in [`ARCHITECTURE.md` §5.3](ARCHITECTURE.md).
+> Full recipe lives in [`ARCHITECTURE.md` §6.3](ARCHITECTURE.md).
 
 1. Add a flag to `application.yml`:
    ```yaml
