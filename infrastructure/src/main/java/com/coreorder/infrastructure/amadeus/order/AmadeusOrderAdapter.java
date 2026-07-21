@@ -75,8 +75,8 @@ public class AmadeusOrderAdapter implements OrderManagementProvider {
     }
 
     @Override
-    public boolean isAvailable() {
-        return client.isReachable();
+    public boolean isEnabled() {
+        return client.isEnabled();
     }
 
     private Order buildMockOrder(OrderCreateRequest request) {

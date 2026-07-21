@@ -50,8 +50,8 @@ public class TravelportFlightSearchAdapter implements FlightSearchProvider {
     }
 
     @Override
-    public boolean isAvailable() {
-        return client.isReachable();
+    public boolean isEnabled() {
+        return client.isEnabled();
     }
 
     private FlightOffer mapToDomainOffer(TravelportClient.TravelportFlightResponse response) {

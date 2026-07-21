@@ -28,9 +28,9 @@ public class TravelportClient {
     }
 
     /**
-     * Check if the Travelport API is reachable.
+     * Check if the Travelport provider is enabled.
      */
-    public boolean isReachable() {
+    public boolean isEnabled() {
         return properties.enabled();
     }
 

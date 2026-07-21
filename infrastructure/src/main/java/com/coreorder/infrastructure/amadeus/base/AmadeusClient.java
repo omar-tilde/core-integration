@@ -28,9 +28,9 @@ public class AmadeusClient {
     }
 
     /**
-     * Check if the Amadeus API is reachable.
+     * Check if the Amadeus provider is enabled.
      */
-    public boolean isReachable() {
+    public boolean isEnabled() {
         return properties.enabled();
     }
 

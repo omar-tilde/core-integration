@@ -50,8 +50,8 @@ public class AmadeusFlightSearchAdapter implements FlightSearchProvider {
     }
 
     @Override
-    public boolean isAvailable() {
-        return client.isReachable();
+    public boolean isEnabled() {
+        return client.isEnabled();
     }
 
     private FlightOffer mapToDomainOffer(AmadeusClient.AmadeusFlightOfferResponse response) {

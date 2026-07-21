@@ -39,7 +39,7 @@ class TravelportFlightSearchAdapterTest {
 
     @Test
     void shouldBeAvailableWhenEnabled() {
-        assertThat(adapter.isAvailable()).isTrue();
+        assertThat(adapter.isEnabled()).isTrue();
     }
 
     @Test
@@ -104,6 +104,6 @@ class TravelportFlightSearchAdapterTest {
         var disabledClient = new TravelportClient(disabledProperties);
         var disabledAdapter = new TravelportFlightSearchAdapter(disabledClient);
 
-        assertThat(disabledAdapter.isAvailable()).isFalse();
+        assertThat(disabledAdapter.isEnabled()).isFalse();
     }
 }

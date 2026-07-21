@@ -41,10 +41,6 @@ public class ProviderRouter {
         return flightSearchRegistry.getProvider(providerId);
     }
 
-    public FlightSearchProvider getFirstAvailableFlightSearchProvider() {
-        return flightSearchRegistry.getFirstAvailableProvider();
-    }
-
     public FlightSearchProvider resolveFlightSearchProvider(ProviderType preferredType) {
         return flightSearchRegistry.resolveProvider(preferredType);
     }
@@ -71,10 +67,6 @@ public class ProviderRouter {
         return orderManagementRegistry.getProvider(providerId);
     }
 
-    public OrderManagementProvider getFirstAvailableOrderManagementProvider() {
-        return orderManagementRegistry.getFirstAvailableProvider();
-    }
-
     public OrderManagementProvider resolveOrderManagementProvider(ProviderType preferredType) {
         return orderManagementRegistry.resolveProvider(preferredType);
     }
@@ -99,10 +91,6 @@ public class ProviderRouter {
 
     public PricingProvider getPricingProvider(String providerId) {
         return pricingRegistry.getProvider(providerId);
-    }
-
-    public PricingProvider getFirstAvailablePricingProvider() {
-        return pricingRegistry.getFirstAvailableProvider();
     }
 
     public PricingProvider resolvePricingProvider(ProviderType preferredType) {

@@ -1,6 +1,5 @@
 package com.coreorder.application.base.provider;
 
-import com.coreorder.application.base.exception.NoProviderAvailableException;
 import com.coreorder.application.base.exception.ProviderNotFoundException;
 import com.coreorder.application.base.exception.ProviderUnavailableException;
 import com.coreorder.domain.model.enums.ProviderType;
@@ -9,11 +8,14 @@ import com.coreorder.domain.port.out.ProviderStrategy;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Generic, strongly-typed strategy registry for provider operations.
  * Resolves domain provider strategies and translates domain exceptions into application-level exceptions.
+ * <p>
+ * A provider is only ever used when it is explicitly requested. Fallback to another provider is
+ * intentionally absent: if the requested provider does not exist, is disabled, or cannot be resolved,
+ * the request fails immediately with a clear error.
  *
  * @param <T> strategy interface extending {@link ProviderStrategy}
  */
@@ -35,101 +37,81 @@ public class ProviderStrategyRegistry<T extends ProviderStrategy> {
     }
 
     /**
-     * Get a specific provider strategy by enum type.
+     * Resolve the explicitly requested provider by enum type.
+     * Fails immediately (no fallback) when the provider is missing or disabled.
      */
     public T getProvider(ProviderType providerType) {
         if (providerType == null) {
-            throw new ProviderNotFoundException("No %s specified".formatted(strategyName));
+            throw new ProviderNotFoundException(
+                    "A provider must be explicitly specified for the %s.".formatted(strategyName));
         }
-        return Optional.ofNullable(strategyMap.get(providerType))
-                .orElseThrow(() -> new ProviderNotFoundException(
-                        "No %s found with ID: '%s'".formatted(strategyName, providerType.name())));
+        T provider = strategyMap.get(providerType);
+        if (provider == null) {
+            throw new ProviderNotFoundException(
+                    "Requested %s '%s' is not available.".formatted(strategyName, providerType.name()));
+        }
+        if (!provider.isEnabled()) {
+            throw new ProviderUnavailableException(
+                    "Requested %s '%s' is disabled.".formatted(strategyName, providerType.name()));
+        }
+        return provider;
     }
 
     /**
-     * Get a specific provider strategy by string identifier code.
+     * Resolve the explicitly requested provider by its string identifier.
+     * Fails immediately (no fallback) when the provider is missing, cannot be resolved, or is disabled.
      */
     public T getProvider(String providerCode) {
+        if (providerCode == null || providerCode.isBlank()) {
+            throw new ProviderNotFoundException(
+                    "A provider must be explicitly specified for the %s.".formatted(strategyName));
+        }
         try {
             ProviderType type = ProviderType.fromCode(providerCode);
+            if (type == null) {
+                throw new ProviderNotFoundException(
+                        "Requested %s '%s' is not available.".formatted(strategyName, providerCode));
+            }
             return getProvider(type);
         } catch (IllegalArgumentException e) {
             throw new ProviderNotFoundException(
-                    "No %s found with ID: '%s'".formatted(strategyName, providerCode));
+                    "Requested %s '%s' is not available.".formatted(strategyName, providerCode));
         }
     }
 
     /**
-     * Get the first available provider strategy.
-     */
-    public T getFirstAvailableProvider() {
-        return strategyMap.values().stream()
-                .filter(ProviderStrategy::isAvailable)
-                .findFirst()
-                .orElseThrow(() -> new NoProviderAvailableException(
-                        "No %s is currently available".formatted(strategyName)));
-    }
-
-    /**
-     * Resolve provider strategy — prefers the specified provider if given and available,
-     * otherwise falls back to the first available provider.
+     * Resolve the explicitly requested provider by enum type.
+     * This is an explicit-request operation: it never falls back to another provider.
      */
     public T resolveProvider(ProviderType preferredProviderType) {
-        if (preferredProviderType != null) {
-            T provider = strategyMap.get(preferredProviderType);
-            if (provider == null) {
-                throw new ProviderNotFoundException(
-                        "%s '%s' not found".formatted(capitalize(strategyName), preferredProviderType.name()));
-            }
-            if (!provider.isAvailable()) {
-                throw new ProviderUnavailableException(
-                        "%s '%s' is currently unavailable".formatted(capitalize(strategyName), preferredProviderType.name()));
-            }
-            return provider;
-        }
-        return getFirstAvailableProvider();
+        return getProvider(preferredProviderType);
     }
 
     /**
-     * Resolve provider strategy by string code.
+     * Resolve the explicitly requested provider by its string identifier.
+     * This is an explicit-request operation: it never falls back to another provider.
      */
     public T resolveProvider(String preferredProviderCode) {
-        if (preferredProviderCode != null && !preferredProviderCode.isBlank()) {
-            try {
-                ProviderType type = ProviderType.fromCode(preferredProviderCode);
-                return resolveProvider(type);
-            } catch (IllegalArgumentException e) {
-                throw new ProviderNotFoundException(
-                        "%s '%s' not found".formatted(capitalize(strategyName), preferredProviderCode));
-            }
-        }
-        return getFirstAvailableProvider();
+        return getProvider(preferredProviderCode);
     }
 
     /**
-     * Get all currently available provider enum types.
+     * Get all currently enabled provider enum types.
      */
     public List<ProviderType> getAvailableProviderTypes() {
         return strategyMap.values().stream()
-                .filter(ProviderStrategy::isAvailable)
+                .filter(ProviderStrategy::isEnabled)
                 .map(ProviderStrategy::providerType)
                 .toList();
     }
 
     /**
-     * Get all currently available provider IDs as strings.
+     * Get all currently enabled provider IDs as strings.
      */
     public List<String> getAvailableProviderIds() {
         return strategyMap.values().stream()
-                .filter(ProviderStrategy::isAvailable)
+                .filter(ProviderStrategy::isEnabled)
                 .map(ProviderStrategy::providerId)
                 .toList();
-    }
-
-    private static String capitalize(String str) {
-        if (str == null || str.isEmpty()) {
-            return str;
-        }
-        return Character.toUpperCase(str.charAt(0)) + str.substring(1);
     }
 }

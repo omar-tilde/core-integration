@@ -49,12 +49,7 @@ public class OrderService {
      * Retrieve an order by its ID.
      */
     public OrderDto retrieveOrder(RetrieveOrderQuery query) {
-        OrderManagementProvider provider;
-        if (query.providerId() != null && !query.providerId().isBlank()) {
-            provider = providerRouter.getOrderManagementProvider(query.providerId());
-        } else {
-            provider = providerRouter.getFirstAvailableOrderManagementProvider();
-        }
+        OrderManagementProvider provider = providerRouter.getOrderManagementProvider(query.providerId());
 
         try {
             Order order = provider.retrieveOrder(query.orderId());

@@ -56,7 +56,7 @@ public class OrderController {
     @GetMapping("/{orderId}")
     public ResponseEntity<OrderResponse> retrieveOrder(
             @PathVariable String orderId,
-            @RequestParam(required = false) String providerId
+            @RequestParam String providerId
     ) {
         var query = new RetrieveOrderQuery(orderId, providerId);
         OrderDto order = orderService.retrieveOrder(query);

@@ -49,8 +49,8 @@ public class TravelportPricingAdapter implements PricingProvider {
     }
 
     @Override
-    public boolean isAvailable() {
-        return client.isReachable();
+    public boolean isEnabled() {
+        return client.isEnabled();
     }
 
     private FlightOffer buildPriceConfirmation(String offerId, List<Passenger> passengers) {

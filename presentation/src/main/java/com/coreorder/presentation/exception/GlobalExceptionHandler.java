@@ -1,7 +1,6 @@
 package com.coreorder.presentation.exception;
 
 import com.coreorder.application.base.exception.InvalidCommandException;
-import com.coreorder.application.base.exception.NoProviderAvailableException;
 import com.coreorder.application.base.exception.ProviderCommunicationException;
 import com.coreorder.application.base.exception.ProviderNotFoundException;
 import com.coreorder.application.base.exception.ProviderUnavailableException;
@@ -115,21 +114,6 @@ public class GlobalExceptionHandler {
         var response = ErrorResponse.of(
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 "Provider Unavailable",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
-
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
-    }
-
-    @ExceptionHandler(NoProviderAvailableException.class)
-    public ResponseEntity<ErrorResponse> handleNoProviderAvailable(
-            NoProviderAvailableException ex,
-            HttpServletRequest request
-    ) {
-        var response = ErrorResponse.of(
-                HttpStatus.SERVICE_UNAVAILABLE.value(),
-                "No Provider Available",
                 ex.getMessage(),
                 request.getRequestURI()
         );

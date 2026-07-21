@@ -48,10 +48,9 @@ class ProviderRouterTest {
     }
 
     @Test
-    void shouldResolveFirstAvailableWhenNoPreference() {
-        var provider = router.resolveFlightSearchProvider((String) null);
-        assertThat(provider).isNotNull();
-        assertThat(provider.isAvailable()).isTrue();
+    void shouldThrowWhenNoProviderSpecified() {
+        assertThatThrownBy(() -> router.resolveFlightSearchProvider((String) null))
+                .isInstanceOf(ProviderNotFoundException.class);
     }
 
     @Test
@@ -97,7 +96,7 @@ class ProviderRouterTest {
         }
 
         @Override
-        public boolean isAvailable() { return available; }
+        public boolean isEnabled() { return available; }
     }
 
     private record FakeOrderManagementProvider(ProviderType type, boolean available) implements OrderManagementProvider {
@@ -114,6 +113,6 @@ class ProviderRouterTest {
         public Order cancelOrder(String providerOrderId) { return null; }
 
         @Override
-        public boolean isAvailable() { return available; }
+        public boolean isEnabled() { return available; }
     }
 }

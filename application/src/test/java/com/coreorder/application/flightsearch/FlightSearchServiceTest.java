@@ -1,5 +1,6 @@
 package com.coreorder.application.flightsearch;
 
+import com.coreorder.application.base.exception.ProviderNotFoundException;
 import com.coreorder.application.base.provider.ProviderRouter;
 import com.coreorder.domain.model.entity.FlightOffer;
 import com.coreorder.domain.model.entity.Itinerary;
@@ -21,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FlightSearchServiceTest {
 
@@ -88,7 +90,7 @@ class FlightSearchServiceTest {
     }
 
     @Test
-    void shouldFallbackToFirstAvailableWhenNoPreference() {
+    void shouldThrowWhenNoProviderSpecified() {
         var command = new SearchFlightsCommand(
                 "ONE_WAY",
                 "CDG",
@@ -102,10 +104,8 @@ class FlightSearchServiceTest {
                 null
         );
 
-        var results = flightSearchService.searchFlights(command);
-
-        assertThat(results).isNotEmpty();
-        assertThat(results.getFirst().providerId()).isIn("TRAVELPORT", "AMADEUS");
+        assertThatThrownBy(() -> flightSearchService.searchFlights(command))
+                .isInstanceOf(ProviderNotFoundException.class);
     }
 
     @Test
@@ -134,7 +134,7 @@ class FlightSearchServiceTest {
         }
 
         @Override
-        public boolean isAvailable() { return true; }
+        public boolean isEnabled() { return true; }
 
         private FlightOffer createSampleOffer() {
             var segment = new Segment(

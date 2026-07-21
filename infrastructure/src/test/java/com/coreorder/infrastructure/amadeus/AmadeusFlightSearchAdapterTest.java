@@ -39,7 +39,7 @@ class AmadeusFlightSearchAdapterTest {
 
     @Test
     void shouldBeAvailableWhenEnabled() {
-        assertThat(adapter.isAvailable()).isTrue();
+        assertThat(adapter.isEnabled()).isTrue();
     }
 
     @Test
@@ -106,6 +106,6 @@ class AmadeusFlightSearchAdapterTest {
         var disabledClient = new AmadeusClient(disabledProperties);
         var disabledAdapter = new AmadeusFlightSearchAdapter(disabledClient);
 
-        assertThat(disabledAdapter.isAvailable()).isFalse();
+        assertThat(disabledAdapter.isEnabled()).isFalse();
     }
 }

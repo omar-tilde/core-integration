@@ -20,7 +20,7 @@ public interface ProviderStrategy {
     }
 
     /**
-     * @return whether this provider adapter is currently reachable and enabled.
+     * @return whether this provider adapter is currently enabled and may be used.
      */
-    boolean isAvailable();
+    boolean isEnabled();
 }
