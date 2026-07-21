@@ -16,9 +16,10 @@ spring:
 
 # ---------------------------------------------------------------------------
 # Provider configuration
-# Set a provider's `enabled` flag to false to remove it from the application
-# context entirely (see ProviderInfrastructureConfiguration for the
-# @ConditionalOnProperty wiring).
+# Each adapter and client is conditionally registered via
+# @ConditionalOnProperty(prefix = "providers.<id>", name = "enabled", havingValue = "true").
+# Setting a provider's `enabled` flag to false removes it from the application
+# context entirely.
 # ---------------------------------------------------------------------------
 providers:
   travelport:
